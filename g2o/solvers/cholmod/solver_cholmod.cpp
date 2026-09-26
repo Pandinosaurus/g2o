@@ -30,10 +30,11 @@
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/core/solver.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
 #include "linear_solver_cholmod.h"
 
-//#define ADD_SCALAR_ORDERING
+// #define ADD_SCALAR_ORDERING
 using namespace std;
 
 namespace g2o {
@@ -41,12 +42,12 @@ namespace g2o {
 namespace {
 template <int p, int l, bool blockorder>
 std::unique_ptr<BlockSolverBase> AllocateSolver() {
-  std::cerr << "# Using CHOLMOD poseDim " << p << " landMarkDim " << l
-            << " blockordering " << blockorder << std::endl;
-  auto linearSolver = g2o::make_unique<
+  G2O_DEBUG("Using CHOLMOD poseDim {} landMarkDim {} blockordering {}", p, l,
+            blockorder);
+  auto linearSolver = std::make_unique<
       LinearSolverCholmod<typename BlockSolverPL<p, l>::PoseMatrixType>>();
   linearSolver->setBlockOrdering(blockorder);
-  return g2o::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
+  return std::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
 }
 }  // namespace
 
@@ -63,7 +64,7 @@ static OptimizationAlgorithm* createSolver(const std::string& fullSolverName) {
           {"fix6_3_cholmod_scalar", &AllocateSolver<6, 3, false>},
           {"fix7_3_cholmod_scalar", &AllocateSolver<7, 3, false>},
 #endif
-      };
+  };
 
   string solverName = fullSolverName.substr(3);
   auto solverf = solver_factories.find(solverName);

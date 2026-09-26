@@ -26,7 +26,9 @@
 
 #include "g2o/core/base_fixed_sized_edge.h"
 
+#include "g2o/core/base_unary_edge.h"
 #include "g2o/core/base_variable_sized_edge.h"
+#include "g2o/core/eigen_types.h"
 #include "g2o/core/robust_kernel_impl.h"
 #include "g2o/types/slam2d/vertex_point_xy.h"
 #include "g2o/types/slam2d/vertex_se2.h"
@@ -39,7 +41,7 @@ class Edge3Constant
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   Edge3Constant()
       : g2o::BaseFixedSizedEdge<2, g2o::Vector2, g2o::VertexSE2, g2o::VertexSE2,
-                                g2o::VertexPointXY>(){};
+                                g2o::VertexPointXY>() {};
   void computeError() {
     const auto a = static_cast<const g2o::VertexSE2*>(_vertices[0])->estimate();
     const auto b = static_cast<const g2o::VertexSE2*>(_vertices[1])->estimate();
@@ -64,6 +66,38 @@ class Edge3Dynamic : public g2o::BaseVariableSizedEdge<2, g2o::Vector2> {
   }
   virtual bool read(std::istream&) { return false; };
   virtual bool write(std::ostream&) const { return false; };
+};
+
+class VertexNotDefaultCtor : public g2o::BaseVertex<2, g2o::Vector2> {
+ public:
+  VertexNotDefaultCtor(int x, int y) { _estimate = g2o::Vector2(x, y); }
+
+  virtual void oplusImpl(const double* update) {
+    _estimate[0] += update[0];
+    _estimate[1] += update[1];
+  }
+
+  virtual void setToOriginImpl() { _estimate.setZero(); }
+  virtual bool read(std::istream& /*is*/) { return false; };
+  virtual bool write(std::ostream& /*os*/) const { return false; };
+};
+
+class EdgeUnaryCreateVertexTester
+    : public g2o::BaseUnaryEdge<2, g2o::Vector2, VertexNotDefaultCtor> {
+ public:
+  EdgeUnaryCreateVertexTester() = default;
+
+  void computeError() {
+    const VertexNotDefaultCtor* v =
+        static_cast<const VertexNotDefaultCtor*>(_vertices[0]);
+    _error = v->estimate() - _measurement;
+  }
+  virtual bool read(std::istream& /*is*/) { return false; };
+  virtual bool write(std::ostream& /*os*/) const { return false; };
+
+  virtual void setMeasurement(const g2o::Vector2& m) { _measurement = m; }
+
+  virtual int measurementDimension() const { return 2; }
 };
 
 TEST(General, IndexToPairToIndex) {
@@ -114,9 +148,9 @@ TEST(General, ConstantEdgeConstructor) {
 TEST(General, FixedEdgeCreateVertex) {
   Edge3Constant e;
 
-  auto v1 = e.createVertex(0);
-  auto v2 = e.createVertex(1);
-  auto v3 = e.createVertex(2);
+  auto* v1 = e.createVertex(0);
+  auto* v2 = e.createVertex(1);
+  auto* v3 = e.createVertex(2);
   ASSERT_EQ(typeid(*v1), typeid(g2o::VertexSE2));
   ASSERT_EQ(typeid(*v2), typeid(g2o::VertexSE2));
   ASSERT_EQ(typeid(*v3), typeid(g2o::VertexPointXY));
@@ -126,6 +160,16 @@ TEST(General, FixedEdgeCreateVertex) {
 
   ASSERT_EQ(nullptr, e.createVertex(-1));
   ASSERT_EQ(nullptr, e.createVertex(3));
+}
+
+TEST(General, FixedEdgeCreateVertexNonDefaultCtor) {
+  EdgeUnaryCreateVertexTester edge;
+  auto* vertex = edge.createVertex(0, 42, 23);
+  EXPECT_NE(vertex, nullptr);
+  ASSERT_EQ(typeid(*vertex), typeid(VertexNotDefaultCtor));
+  auto* casted_vertex = dynamic_cast<VertexNotDefaultCtor*>(vertex);
+  ASSERT_NE(casted_vertex, nullptr);
+  EXPECT_TRUE(casted_vertex->estimate().isApprox(g2o::Vector2(42, 23)));
 }
 
 template <typename EdgeType>
@@ -170,12 +214,12 @@ class EdgeTester {
 
   g2o::JacobianWorkspace jacobianWorkspace;
 
-  Eigen::Matrix<number_t, 3, 3> hessian01;
-  Eigen::Matrix<number_t, 3, 2> hessian02;
-  Eigen::Matrix<number_t, 3, 2> hessian12;
-  Eigen::Matrix<number_t, 3, 3> hessian00;
-  Eigen::Matrix<number_t, 3, 3> hessian11;
-  Eigen::Matrix<number_t, 2, 2> hessian22;
+  Eigen::Matrix<double, 3, 3> hessian01;
+  Eigen::Matrix<double, 3, 2> hessian02;
+  Eigen::Matrix<double, 3, 2> hessian12;
+  Eigen::Matrix<double, 3, 3> hessian00;
+  Eigen::Matrix<double, 3, 3> hessian11;
+  Eigen::Matrix<double, 2, 2> hessian22;
 };
 
 TEST(ConstantEdgeTest, ConstantEdge_allVerticesFixed) {
@@ -285,16 +329,16 @@ TEST(ConstantEdgeTest, ConstantEdge_constructQuadraticForm_rowMajor) {
   EdgeTester<Edge3Dynamic> dynamic;
   EdgeTester<Edge3Constant> constant;
   dynamic.edge.mapHessianMemory(dynamic.hessian01.data(), 0, 1, true);
-  Eigen::Matrix<number_t, 2, 3> hessian20_dynamic;
-  Eigen::Matrix<number_t, 2, 3> hessian21_dynamic;
+  Eigen::Matrix<double, 2, 3> hessian20_dynamic;
+  Eigen::Matrix<double, 2, 3> hessian21_dynamic;
   hessian20_dynamic.setZero();
   hessian21_dynamic.setZero();
   dynamic.edge.mapHessianMemory(hessian20_dynamic.data(), 0, 2, true);
   dynamic.edge.mapHessianMemory(hessian21_dynamic.data(), 1, 2, true);
 
   constant.edge.mapHessianMemory(constant.hessian01.data(), 0, 1, true);
-  Eigen::Matrix<number_t, 2, 3> hessian20_constant;
-  Eigen::Matrix<number_t, 2, 3> hessian21_constant;
+  Eigen::Matrix<double, 2, 3> hessian20_constant;
+  Eigen::Matrix<double, 2, 3> hessian21_constant;
   hessian20_constant.setZero();
   hessian21_constant.setZero();
   constant.edge.mapHessianMemory(hessian20_constant.data(), 0, 2, true);
@@ -331,4 +375,9 @@ TEST(ConstantEdgeTest, ConstantEdge_constructQuadraticForm_rowMajor) {
       0.0,
       (constant_colMajor.hessian12 - hessian21_constant.transpose()).norm(),
       1e-7);
+}
+
+TEST(ConstantEdgeTest, NotCopyAssignable) {
+  EXPECT_FALSE(std::is_copy_assignable<Edge3Constant>::value);
+  EXPECT_FALSE(std::is_copy_assignable<VertexNotDefaultCtor>::value);
 }

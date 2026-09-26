@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "g2o/config.h"
-#include "g2o/stuff/misc.h"
 #include "g2o/stuff/sparse_helper.h"
 #include "matrix_operations.h"
 #include "matrix_structure.h"
@@ -167,21 +166,20 @@ class SparseBlockMatrix {
                 const SparseBlockMatrix<MatrixFactorType>* M) const;
 
   //! dest = (*this) *  src
-  void multiply(number_t*& dest, const number_t* src) const;
+  void multiply(double*& dest, const double* src) const;
 
   /**
    * compute dest = (*this) *  src
    * However, assuming that this is a symmetric matrix where only the upper
    * triangle is stored
    */
-  void multiplySymmetricUpperTriangle(number_t*& dest,
-                                      const number_t* src) const;
+  void multiplySymmetricUpperTriangle(double*& dest, const double* src) const;
 
   //! dest = M * (*this)
-  void rightMultiply(number_t*& dest, const number_t* src) const;
+  void rightMultiply(double*& dest, const double* src) const;
 
   //! *this *= a
-  void scale(number_t a);
+  void scale(double a);
 
   /**
    * writes in dest a block permutaton specified by pinv.
@@ -193,14 +191,14 @@ class SparseBlockMatrix {
   /**
    * fill the CCS arrays of a matrix, arrays have to be allocated beforehand
    */
-  int fillCCS(int* Cp, int* Ci, number_t* Cx, bool upperTriangle = false) const;
+  int fillCCS(int* Cp, int* Ci, double* Cx, bool upperTriangle = false) const;
 
   /**
    * fill the CCS arrays of a matrix, arrays have to be allocated beforehand.
    * This function only writes the values and assumes that column and row
    * structures have already been written.
    */
-  int fillCCS(number_t* Cx, bool upperTriangle = false) const;
+  int fillCCS(double* Cx, bool upperTriangle = false) const;
 
   //! exports the non zero blocks in the structure matrix ms
   void fillBlockStructure(MatrixStructure& ms) const;

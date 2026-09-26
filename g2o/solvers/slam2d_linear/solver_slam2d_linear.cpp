@@ -27,12 +27,14 @@
 #include "solver_slam2d_linear.h"
 
 #include <Eigen/Core>
+#include <cassert>
 
 #include "g2o/core/hyper_dijkstra.h"
 #include "g2o/core/solver.h"
 #include "g2o/core/sparse_block_matrix.h"
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/solvers/eigen/linear_solver_eigen.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/misc.h"
 #include "g2o/types/slam2d/edge_se2.h"
 
@@ -41,20 +43,20 @@ using namespace std;
 namespace g2o {
 
 /**
- * \brief compute the initial guess of theta while travelling along the MST
+ * \brief compute the initial guess of theta while traveling along the MST
  */
 class ThetaTreeAction : public HyperDijkstra::TreeAction {
  public:
   explicit ThetaTreeAction(VectorX& theta)
       : HyperDijkstra::TreeAction(), _thetaGuess(theta) {}
-  virtual number_t perform(HyperGraph::Vertex* v, HyperGraph::Vertex* vParent,
-                           HyperGraph::Edge* e) {
+  virtual double perform(HyperGraph::Vertex* v, HyperGraph::Vertex* vParent,
+                         HyperGraph::Edge* e) {
     if (!vParent) return 0.;
     EdgeSE2* odom = static_cast<EdgeSE2*>(e);
     VertexSE2* from = static_cast<VertexSE2*>(vParent);
     VertexSE2* to = static_cast<VertexSE2*>(v);
     assert(to->hessianIndex() >= 0);
-    number_t fromTheta =
+    double fromTheta =
         from->hessianIndex() < 0 ? 0. : _thetaGuess[from->hessianIndex()];
     bool direct = odom->vertices()[0] == from;
     if (direct)
@@ -94,13 +96,13 @@ bool SolverSLAM2DLinear::solveOrientation() {
   b.setZero(_optimizer->indexMapping().size());
   x.setZero(_optimizer->indexMapping().size());
 
-  typedef Eigen::Matrix<number_t, 1, 1, Eigen::ColMajor> ScalarMatrix;
+  typedef Eigen::Matrix<double, 1, 1, Eigen::ColMajor> ScalarMatrix;
 
-  std::vector<int> blockIndeces(_optimizer->indexMapping().size());
+  std::vector<int> blockIndices(_optimizer->indexMapping().size());
   for (size_t i = 0; i < _optimizer->indexMapping().size(); ++i)
-    blockIndeces[i] = i + 1;
+    blockIndices[i] = i + 1;
 
-  SparseBlockMatrix<ScalarMatrix> H(blockIndeces.data(), blockIndeces.data(),
+  SparseBlockMatrix<ScalarMatrix> H(blockIndices.data(), blockIndices.data(),
                                     _optimizer->indexMapping().size(),
                                     _optimizer->indexMapping().size());
 
@@ -169,20 +171,20 @@ bool SolverSLAM2DLinear::solveOrientation() {
     VertexSE2* from = static_cast<VertexSE2*>(e->vertices()[0]);
     VertexSE2* to = static_cast<VertexSE2*>(e->vertices()[1]);
 
-    number_t omega = e->information()(2, 2);
+    double omega = e->information()(2, 2);
 
-    number_t fromThetaGuess =
+    double fromThetaGuess =
         from->hessianIndex() < 0 ? 0. : thetaGuess[from->hessianIndex()];
-    number_t toThetaGuess =
+    double toThetaGuess =
         to->hessianIndex() < 0 ? 0. : thetaGuess[to->hessianIndex()];
-    number_t error = normalize_theta(-e->measurement().rotation().angle() +
-                                     toThetaGuess - fromThetaGuess);
+    double error = normalize_theta(-e->measurement().rotation().angle() +
+                                   toThetaGuess - fromThetaGuess);
 
     bool fromNotFixed = !(from->fixed());
     bool toNotFixed = !(to->fixed());
 
     if (fromNotFixed || toNotFixed) {
-      number_t omega_r = -omega * error;
+      double omega_r = -omega * error;
       if (fromNotFixed) {
         b(from->hessianIndex()) -= omega_r;
         (*H.block(from->hessianIndex(), from->hessianIndex()))(0, 0) += omega;
@@ -206,8 +208,7 @@ bool SolverSLAM2DLinear::solveOrientation() {
   linearSystemSolver.init();
   bool ok = linearSystemSolver.solve(H, x.data(), b.data());
   if (!ok) {
-    cerr << __PRETTY_FUNCTION__ << "Failure while solving linear system"
-         << endl;
+    G2O_ERROR("Failure while solving linear system");
     return false;
   }
 

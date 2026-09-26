@@ -26,8 +26,6 @@
 
 #include "edge_se3.h"
 
-#include <iostream>
-
 #include "isometry3d_gradients.h"
 
 #ifdef G2O_HAVE_OPENGL
@@ -44,14 +42,12 @@ EdgeSE3::EdgeSE3() : BaseBinaryEdge<6, Isometry3, VertexSE3, VertexSE3>() {
 
 bool EdgeSE3::read(std::istream& is) {
   Vector7 meas;
-  internal::readVector(is, meas);
+  if (!internal::readVector(is, meas)) return false;
   // normalize the quaternion to recover numerical precision lost by storing as
   // human readable text
   Vector4::MapType(meas.data() + 3).normalize();
   setMeasurement(internal::fromVectorQT(meas));
-  if (is.bad()) return false;
-  readInformationMatrix(is);
-  return is.good() || is.eof();
+  return readInformationMatrix(is);
 }
 
 bool EdgeSE3::write(std::ostream& os) const {
@@ -98,7 +94,6 @@ void EdgeSE3::initialEstimate(const OptimizableGraph::VertexSet& from_,
     to->setEstimate(from->estimate() * _measurement);
   } else
     from->setEstimate(to->estimate() * _measurement.inverse());
-  // cerr << "IE" << endl;
 }
 
 EdgeSE3WriteGnuplotAction::EdgeSE3WriteGnuplotAction()
@@ -111,8 +106,6 @@ HyperGraphElementAction* EdgeSE3WriteGnuplotAction::operator()(
   WriteGnuplotAction::Parameters* params =
       static_cast<WriteGnuplotAction::Parameters*>(params_);
   if (!params->os) {
-    std::cerr << __PRETTY_FUNCTION__ << ": warning, on valid os specified"
-              << std::endl;
     return nullptr;
   }
 

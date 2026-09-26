@@ -24,6 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cassert>
 #include <csignal>
 #include <fstream>
 #include <iostream>
@@ -77,12 +78,12 @@ class EdgeCalib
     // get the calibrated motion given by the odometry
     double rl = -odomParams->estimate() * linearSolution(0);
     double rr = odomParams->estimate() * linearSolution(1);
-    VelocityMeasurement calibratedVelocityMeasurment(
+    VelocityMeasurement calibratedVelocityMeasurement(
         measurement().velocityMeasurement.vl() * rl,
         measurement().velocityMeasurement.vr() * rr,
         measurement().velocityMeasurement.dt());
     MotionMeasurement mm = OdomConvert::convertToMotion(
-        calibratedVelocityMeasurment, odomParams->estimate());
+        calibratedVelocityMeasurement, odomParams->estimate());
     SE2 Ku_ij;
     Ku_ij.fromVector(mm.measurement());
 
@@ -155,8 +156,7 @@ int main(int argc, char** argv) {
   }
 
   // adding the measurements
-  vector<MotionInformation, Eigen::aligned_allocator<MotionInformation> >
-      motions;
+  vector<MotionInformation> motions;
   {
     std::map<double, RobotData*>::const_iterator it =
         robotLaserQueue.buffer().begin();
@@ -344,13 +344,13 @@ int main(int argc, char** argv) {
             OdomConvert::convertToVelocity(motionMeasurement);
 
         // apply calibration
-        VelocityMeasurement calibratedVelocityMeasurment = velocityMeasurement;
-        calibratedVelocityMeasurment.setVl(odomCalib(0) *
-                                           calibratedVelocityMeasurment.vl());
-        calibratedVelocityMeasurment.setVr(odomCalib(1) *
-                                           calibratedVelocityMeasurment.vr());
+        VelocityMeasurement calibratedVelocityMeasurement = velocityMeasurement;
+        calibratedVelocityMeasurement.setVl(odomCalib(0) *
+                                            calibratedVelocityMeasurement.vl());
+        calibratedVelocityMeasurement.setVr(odomCalib(1) *
+                                            calibratedVelocityMeasurement.vr());
         MotionMeasurement mm = OdomConvert::convertToMotion(
-            calibratedVelocityMeasurment, odomCalib(2));
+            calibratedVelocityMeasurement, odomCalib(2));
 
         // combine calibrated odometry with the previous pose
         SE2 remappedOdom;

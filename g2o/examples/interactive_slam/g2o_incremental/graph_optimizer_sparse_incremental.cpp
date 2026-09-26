@@ -16,10 +16,13 @@
 
 #include "graph_optimizer_sparse_incremental.h"
 
+#include <cassert>
+
 #include "g2o/core/block_solver.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/examples/interactive_slam/g2o_interactive/types_slam2d_online.h"
 #include "g2o/examples/interactive_slam/g2o_interactive/types_slam3d_online.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
 
 using namespace std;
@@ -34,8 +37,8 @@ std::unique_ptr<g2o::Solver> AllocateCholmodSolver() {
   std::cerr << "# Using CHOLMOD online poseDim " << p << " landMarkDim " << l
             << " blockordering 1" << std::endl;
 
-  return g2o::make_unique<BlockSolverPL<p, l>>(
-      g2o::make_unique<LinearSolverCholmodOnline<
+  return std::make_unique<BlockSolverPL<p, l>>(
+      std::make_unique<LinearSolverCholmodOnline<
           typename BlockSolverPL<p, l>::PoseMatrixType>>());
 }
 
@@ -43,9 +46,9 @@ std::unique_ptr<g2o::Solver> AllocateCholmodSolver() {
  * \brief backing up some information about the vertex
  */
 struct VertexBackup {
-  int hessianIndex;
-  OptimizableGraph::Vertex* vertex;
-  double* hessianData;
+  int hessianIndex = 0;
+  OptimizableGraph::Vertex* vertex = nullptr;
+  double* hessianData = nullptr;
   bool operator<(const VertexBackup& other) const {
     return hessianIndex < other.hessianIndex;
   }
@@ -53,7 +56,7 @@ struct VertexBackup {
 }  // namespace
 
 SparseOptimizerIncremental::SparseOptimizerIncremental() {
-  _cholmodSparse = new CholmodExt();
+  _cholmodSparse = new cholmod::CholmodExt();
   _cholmodFactor = 0;
   cholmod_start(&_cholmodCommon);
 
@@ -69,7 +72,7 @@ SparseOptimizerIncremental::SparseOptimizerIncremental() {
   _cholmodFactor = 0;
   _solverInterface = 0;
 
-  _permutedUpdateAsSparse = new CholmodExt;
+  _permutedUpdateAsSparse = new cholmod::CholmodExt;
 }
 
 SparseOptimizerIncremental::~SparseOptimizerIncremental() {
@@ -96,8 +99,7 @@ int SparseOptimizerIncremental::optimize(int iterations, bool online) {
     if (!online) {
       ok = _underlyingSolver->buildStructure();
       if (!ok) {
-        cerr << __PRETTY_FUNCTION__ << ": Failure while building CCS structure"
-             << endl;
+        G2O_ERROR("Failure while building CCS structure");
         return 0;
       }
     }
@@ -148,7 +150,7 @@ int SparseOptimizerIncremental::optimize(int iterations, bool online) {
     // get the current cholesky factor along with the permutation
     _L = _solverInterface->L();
     if (_perm.size() < (int)_L->n) _perm.resize(2 * _L->n);
-    int* p = (int*)_L->Perm;
+    int* p = static_cast<int*>(_L->Perm);
     for (size_t i = 0; i < _L->n; ++i) _perm[p[i]] = i;
 
   } else {
@@ -233,12 +235,7 @@ bool SparseOptimizerIncremental::updateInitialization(
   // cerr << "updating index mapping done." << endl;
 
   // backup the tempindex and prepare sorting structure
-#ifdef _MSC_VER
-  VertexBackup* backupIdx = new VertexBackup[_touchedVertices.size()];
-#else
-  VertexBackup backupIdx[_touchedVertices.size()];
-#endif
-  memset(backupIdx, 0, sizeof(VertexBackup) * _touchedVertices.size());
+  std::vector<VertexBackup> backupIdx(_touchedVertices.size());
   int idx = 0;
   for (HyperGraph::VertexSet::iterator it = _touchedVertices.begin();
        it != _touchedVertices.end(); ++it) {
@@ -248,10 +245,8 @@ bool SparseOptimizerIncremental::updateInitialization(
     backupIdx[idx].hessianData = v->hessianData();
     ++idx;
   }
-  sort(backupIdx,
-       backupIdx +
-           _touchedVertices
-               .size());  // sort according to the hessianIndex which is the
+  sort(backupIdx.begin(),
+       backupIdx.end());  // sort according to the hessianIndex which is the
                           // same order as used later by the optimizer
   for (int i = 0; i < idx; ++i) {
     backupIdx[i].vertex->setHessianIndex(i);
@@ -283,7 +278,9 @@ bool SparseOptimizerIncremental::updateInitialization(
       lastBlock = m;
     }
   }
-  lastBlock->diagonal().array() += 1e-6;  // HACK to get Eigen value > 0
+  if (lastBlock) {
+    lastBlock->diagonal().array() += 1e-6;  // HACK to get Eigen value > 0
+  }
 
   for (HyperGraph::EdgeSet::const_iterator it = eset.begin(); it != eset.end();
        ++it) {
@@ -343,12 +340,12 @@ bool SparseOptimizerIncremental::updateInitialization(
   _permutedUpdate->nnz = 0;
   _permutedUpdate->nrow = _permutedUpdate->ncol = _L->n;
   {
-    int* Ap = (int*)updateAsSparseFactor->p;
-    int* Ai = (int*)updateAsSparseFactor->i;
-    double* Ax = (double*)updateAsSparseFactor->x;
-    int* Bj = (int*)_permutedUpdate->j;
-    int* Bi = (int*)_permutedUpdate->i;
-    double* Bx = (double*)_permutedUpdate->x;
+    int* Ap = static_cast<int*>(updateAsSparseFactor->p);
+    int* Ai = static_cast<int*>(updateAsSparseFactor->i);
+    double* Ax = static_cast<double*>(updateAsSparseFactor->x);
+    int* Bj = static_cast<int*>(_permutedUpdate->j);
+    int* Bi = static_cast<int*>(_permutedUpdate->i);
+    double* Bx = static_cast<double*>(_permutedUpdate->x);
     for (size_t c = 0; c < updateAsSparseFactor->ncol; ++c) {
       const int& rbeg = Ap[c];
       const int& rend = Ap[c + 1];
@@ -376,9 +373,6 @@ bool SparseOptimizerIncremental::updateInitialization(
     }
   }
   cholmod_free_sparse(&updateAsSparseFactor, &_cholmodCommon);
-#ifdef _MSC_VER
-  delete[] backupIdx;
-#endif
 
 #if 0
     cholmod_sparse* updatePermuted = cholmod_triplet_to_sparse(_permutedUpdate, _permutedUpdate->nnz, &_cholmodCommon);
@@ -404,33 +398,32 @@ bool SparseOptimizerIncremental::computeCholeskyUpdate() {
   size_t n = A.cols();
 
   if (_cholmodSparse->columnsAllocated < n) {
-    // std::cerr << __PRETTY_FUNCTION__ << ": reallocating columns" <<
-    // std::endl;
+    G2O_DEBUG("reallocating columns");
     _cholmodSparse->columnsAllocated =
         _cholmodSparse->columnsAllocated == 0
             ? n
             : 2 * n;  // pre-allocate more space if re-allocating
-    delete[](int*) _cholmodSparse->p;
+    delete[] static_cast<int*>(_cholmodSparse->p);
     _cholmodSparse->p = new int[_cholmodSparse->columnsAllocated + 1];
   }
   size_t nzmax = A.nonZeros();
   if (_cholmodSparse->nzmax < nzmax) {
-    // std::cerr << __PRETTY_FUNCTION__ << ": reallocating row + values" <<
-    // std::endl;
+    G2O_DEBUG("reallocating row + values");
     _cholmodSparse->nzmax =
         _cholmodSparse->nzmax == 0
             ? nzmax
             : 2 * nzmax;  // pre-allocate more space if re-allocating
-    delete[](double*) _cholmodSparse->x;
-    delete[](int*) _cholmodSparse->i;
+    delete[] static_cast<double*>(_cholmodSparse->x);
+    delete[] static_cast<int*>(_cholmodSparse->i);
     _cholmodSparse->i = new int[_cholmodSparse->nzmax];
     _cholmodSparse->x = new double[_cholmodSparse->nzmax];
   }
   _cholmodSparse->ncol = n;
   _cholmodSparse->nrow = m;
 
-  A.fillCCS((int*)_cholmodSparse->p, (int*)_cholmodSparse->i,
-            (double*)_cholmodSparse->x, true);
+  A.fillCCS(static_cast<int*>(_cholmodSparse->p),
+            static_cast<int*>(_cholmodSparse->i),
+            static_cast<double*>(_cholmodSparse->x), true);
   // writeCCSMatrix("updatesparse.txt", _cholmodSparse->nrow,
   // _cholmodSparse->ncol, (int*)_cholmodSparse->p, (int*)_cholmodSparse->i,
   // (double*)_cholmodSparse->x, true);
@@ -478,7 +471,7 @@ static OptimizationAlgorithm* createSolver(const std::string& solverName) {
 }
 
 bool SparseOptimizerIncremental::initSolver(int dimension, int batchEveryN) {
-  // cerr << __PRETTY_FUNCTION__ << endl;
+  G2O_TRACE("init solver");
   slamDimension = dimension;
   if (dimension == 3) {
     setAlgorithm(createSolver("fix3_2_cholmod"));
@@ -531,15 +524,15 @@ void SparseOptimizerIncremental::convertTripletUpdateToSparse() {
   // reallocate num-zeros
   if (_permutedUpdateAsSparse->nzmax < _permutedUpdate->nzmax) {
     _permutedUpdateAsSparse->nzmax = _permutedUpdate->nzmax;
-    delete[](int*) _permutedUpdateAsSparse->i;
-    delete[](double*) _permutedUpdateAsSparse->x;
+    delete[] static_cast<int*>(_permutedUpdateAsSparse->i);
+    delete[] static_cast<double*>(_permutedUpdateAsSparse->x);
     _permutedUpdateAsSparse->x = new double[_permutedUpdateAsSparse->nzmax];
     _permutedUpdateAsSparse->i = new int[_permutedUpdateAsSparse->nzmax];
   }
 
   if (_permutedUpdateAsSparse->columnsAllocated < _permutedUpdate->ncol) {
     _permutedUpdateAsSparse->columnsAllocated = 2 * _permutedUpdate->ncol;
-    delete[](int*) _permutedUpdateAsSparse->p;
+    delete[] static_cast<int*>(_permutedUpdateAsSparse->p);
     _permutedUpdateAsSparse->p =
         new int[_permutedUpdateAsSparse->columnsAllocated + 1];
   }
@@ -550,13 +543,13 @@ void SparseOptimizerIncremental::convertTripletUpdateToSparse() {
   int* w = _tripletWorkspace.data();
   memset(w, 0, sizeof(int) * _permutedUpdate->ncol);
 
-  int* Ti = (int*)_permutedUpdate->i;
-  int* Tj = (int*)_permutedUpdate->j;
-  double* Tx = (double*)_permutedUpdate->x;
+  int* Ti = static_cast<int*>(_permutedUpdate->i);
+  int* Tj = static_cast<int*>(_permutedUpdate->j);
+  double* Tx = static_cast<double*>(_permutedUpdate->x);
 
-  int* Cp = (int*)_permutedUpdateAsSparse->p;
-  int* Ci = (int*)_permutedUpdateAsSparse->i;
-  double* Cx = (double*)_permutedUpdateAsSparse->x;
+  int* Cp = static_cast<int*>(_permutedUpdateAsSparse->p);
+  int* Ci = static_cast<int*>(_permutedUpdateAsSparse->i);
+  double* Cx = static_cast<double*>(_permutedUpdateAsSparse->x);
 
   for (size_t k = 0; k < _permutedUpdate->nnz; ++k) /* column counts */
     w[Tj[k]]++;

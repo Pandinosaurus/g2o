@@ -26,36 +26,37 @@
 
 #include "edge_project_p2sc.h"
 
+#include <cmath>
+
 namespace g2o {
 
 // point to camera projection, stereo
 EdgeProjectP2SC::EdgeProjectP2SC()
     : BaseBinaryEdge<3, Vector3, VertexPointXYZ, VertexCam>() {}
 
-bool EdgeProjectP2SC::read(std::istream &is) {
-  internal::readVector(is, _measurement);
+bool EdgeProjectP2SC::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
   return readInformationMatrix(is);
 }
 
-bool EdgeProjectP2SC::write(std::ostream &os) const {
-  internal::writeVector(os, measurement());
-  writeInformationMatrix(os);
-  return os.good();
+bool EdgeProjectP2SC::write(std::ostream& os) const {
+  if (!internal::writeVector(os, measurement())) return false;
+  return writeInformationMatrix(os);
 }
 
 // return the error estimate as a 2-vector
 void EdgeProjectP2SC::computeError() {
   // from <Point> to <Cam>
-  const VertexPointXYZ *point =
-      static_cast<const VertexPointXYZ *>(_vertices[0]);
-  VertexCam *cam = static_cast<VertexCam *>(_vertices[1]);
+  const VertexPointXYZ* point =
+      static_cast<const VertexPointXYZ*>(_vertices[0]);
+  VertexCam* cam = static_cast<VertexCam*>(_vertices[1]);
 
   // calculate the projection
   Vector3 kp;
   Vector4 pt;
   pt.head<3>() = point->estimate();
   pt(3) = 1;
-  const SBACam &nd = cam->estimate();
+  const SBACam& nd = cam->estimate();
   // these should be already ok
   /* nd.setTransform(); */
   /* nd.setProjection(); */
@@ -65,7 +66,7 @@ void EdgeProjectP2SC::computeError() {
   Vector3 p2 = nd.w2n * pt;
   Vector3 pb(nd.baseline, 0, 0);
 
-  number_t invp1 = cst(1.0) / p1(2);
+  double invp1 = cst(1.0) / p1(2);
   kp.head<2>() = p1.head<2>() * invp1;
 
   // right camera px
@@ -85,10 +86,10 @@ void EdgeProjectP2SC::computeError() {
 }
 
 void EdgeProjectP2SC::linearizeOplus() {
-  VertexCam *vc = static_cast<VertexCam *>(_vertices[1]);
-  const SBACam &cam = vc->estimate();
+  VertexCam* vc = static_cast<VertexCam*>(_vertices[1]);
+  const SBACam& cam = vc->estimate();
 
-  VertexPointXYZ *vp = static_cast<VertexPointXYZ *>(_vertices[0]);
+  VertexPointXYZ* vp = static_cast<VertexPointXYZ*>(_vertices[0]);
   Vector4 pt, trans;
   pt.head<3>() = vp->estimate();
   pt(3) = 1.0;
@@ -100,18 +101,18 @@ void EdgeProjectP2SC::linearizeOplus() {
 
   // Jacobians wrt camera parameters
   // set d(quat-x) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  number_t px = pc(0);
-  number_t py = pc(1);
-  number_t pz = pc(2);
-  number_t ipz2 = 1.0 / (pz * pz);
-  if (g2o_isnan(ipz2)) {
+  double px = pc(0);
+  double py = pc(1);
+  double pz = pc(2);
+  double ipz2 = 1.0 / (pz * pz);
+  if (std::isnan(ipz2)) {
     std::cout << "[SetJac] infinite jac" << std::endl;
     abort();
   }
 
-  number_t ipz2fx = ipz2 * cam.Kcam(0, 0);  // Fx
-  number_t ipz2fy = ipz2 * cam.Kcam(1, 1);  // Fy
-  number_t b = cam.baseline;                // stereo baseline
+  double ipz2fx = ipz2 * cam.Kcam(0, 0);  // Fx
+  double ipz2fy = ipz2 * cam.Kcam(1, 1);  // Fy
+  double b = cam.baseline;                // stereo baseline
 
   // check for local vars
   Vector3 pwt =

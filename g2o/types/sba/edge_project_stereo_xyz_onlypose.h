@@ -42,9 +42,23 @@ class G2O_TYPES_SBA_API EdgeStereoSE3ProjectXYZOnlyPose
 
   EdgeStereoSE3ProjectXYZOnlyPose() {}
 
-  bool read(std::istream &is);
+  bool read(std::istream& is);
 
-  bool write(std::ostream &os) const;
+  bool write(std::ostream& os) const;
+
+  virtual bool setMeasurementData(const double* m) {
+    Eigen::Map<const Vector3> v(m);
+    setMeasurement(v);
+    return true;
+  }
+
+  virtual bool getMeasurementData(double* m) const {
+    Eigen::Map<Vector3> v(m);
+    v = measurement();
+    return true;
+  }
+
+  virtual int measurementDimension() const { return 3; }
 
   void computeError();
 
@@ -52,10 +66,10 @@ class G2O_TYPES_SBA_API EdgeStereoSE3ProjectXYZOnlyPose
 
   virtual void linearizeOplus();
 
-  Vector3 cam_project(const Vector3 &trans_xyz) const;
+  Vector3 cam_project(const Vector3& trans_xyz) const;
 
   Vector3 Xw;
-  number_t fx, fy, cx, cy, bf;
+  double fx, fy, cx, cy, bf;
 };
 
 }  // namespace g2o

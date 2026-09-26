@@ -18,8 +18,15 @@
 #define G2O_LINEAR_SOLVER_CHOLMOD_ONLINE
 
 #include <camd.h>
+#include <cholmod.h>
 
-#include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include <cassert>
+
+#include "g2o/core/batch_stats.h"
+#include "g2o/core/linear_solver.h"
+#include "g2o/solvers/cholmod/cholmod_ext.h"
+#include "g2o/stuff/logger.h"
+#include "g2o/stuff/timeutil.h"
 #include "g2o_incremental_api.h"
 
 namespace g2o {
@@ -46,7 +53,7 @@ class LinearSolverCholmodOnline : public LinearSolver<MatrixType>,
                                   public LinearSolverCholmodOnlineInterface {
  public:
   LinearSolverCholmodOnline() : LinearSolver<MatrixType>() {
-    _cholmodSparse = new CholmodExt();
+    _cholmodSparse = new cholmod::CholmodExt();
     _cholmodFactor = 0;
     cholmod_start(&_cholmodCommon);
 
@@ -132,7 +139,7 @@ class LinearSolverCholmodOnline : public LinearSolver<MatrixType>,
 
   int choleskyUpdate(cholmod_sparse* update) {
     int result = cholmod_updown(1, update, _cholmodFactor, &_cholmodCommon);
-    // std::cerr << __PRETTY_FUNCTION__ << " " << result << std::endl;
+    G2O_TRACE("result {}", result);
     if (_cholmodCommon.status == CHOLMOD_NOT_POSDEF) {
       std::cerr
           << "Cholesky failure, writing debug.txt (Hessian loadable by Octave)"
@@ -165,7 +172,7 @@ class LinearSolverCholmodOnline : public LinearSolver<MatrixType>,
  protected:
   // temp used for cholesky with cholmod
   cholmod_common _cholmodCommon;
-  CholmodExt* _cholmodSparse;
+  cholmod::CholmodExt* _cholmodSparse;
   cholmod_factor* _cholmodFactor;
   bool _blockOrdering;
   MatrixStructure _matrixStructure;
@@ -229,26 +236,24 @@ class LinearSolverCholmodOnline : public LinearSolver<MatrixType>,
     size_t n = A.cols() + additionalSpace;
 
     if (_cholmodSparse->columnsAllocated < n) {
-      // std::cerr << __PRETTY_FUNCTION__ << ": reallocating columns" <<
-      // std::endl;
+      G2O_DEBUG("reallocating columns");
       _cholmodSparse->columnsAllocated =
           _cholmodSparse->columnsAllocated == 0
               ? n
               : 2 * n;  // pre-allocate more space if re-allocating
-      delete[](int*) _cholmodSparse->p;
+      delete[] (int*)_cholmodSparse->p;
       _cholmodSparse->p = new int[_cholmodSparse->columnsAllocated + 1];
     }
     if (!onlyValues) {
       size_t nzmax = A.nonZeros() + additionalSpace;
       if (_cholmodSparse->nzmax < nzmax) {
-        // std::cerr << __PRETTY_FUNCTION__ << ": reallocating row + values" <<
-        // std::endl;
+        G2O_DEBUG("reallocating row + values");
         _cholmodSparse->nzmax =
             _cholmodSparse->nzmax == 0
                 ? nzmax
                 : 2 * nzmax;  // pre-allocate more space if re-allocating
-        delete[](double*) _cholmodSparse->x;
-        delete[](int*) _cholmodSparse->i;
+        delete[] (double*)_cholmodSparse->x;
+        delete[] (int*)_cholmodSparse->i;
         _cholmodSparse->i = new int[_cholmodSparse->nzmax];
         _cholmodSparse->x = new double[_cholmodSparse->nzmax];
       }

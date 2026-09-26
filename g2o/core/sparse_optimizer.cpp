@@ -28,20 +28,36 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iomanip>
 #include <iostream>
-#include <iterator>
+#include <utility>
 
 #include "batch_stats.h"
 #include "estimate_propagator.h"
-#include "g2o/config.h"
+#include "g2o/config.h"  // IWYU pragma: keep
+#include "g2o/core/optimizable_graph.h"
 #include "g2o/core/ownership.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
-#include "g2o/stuff/misc.h"
 #include "g2o/stuff/timeutil.h"
 #include "hyper_graph_action.h"
 #include "optimization_algorithm.h"
 #include "robust_kernel.h"
+
+#ifndef NDEBUG
+namespace {
+/**
+ * tests whether there is a NaN in the array
+ */
+bool arrayHasNaN(const double* array, int size, int* nanIndex = 0) {
+  for (int i = 0; i < size; ++i)
+    if (std::isnan(array[i])) {
+      if (nanIndex) *nanIndex = i;
+      return true;
+    }
+  return false;
+}
+}  // namespace
+#endif
 
 namespace g2o {
 using namespace std;
@@ -81,15 +97,15 @@ void SparseOptimizer::computeActiveErrors() {
     OptimizableGraph::Edge* e = _activeEdges[k];
     bool hasNan = arrayHasNaN(e->errorData(), e->dimension());
     if (hasNan) {
-      cerr << "computeActiveErrors(): found NaN in error for edge " << e
-           << endl;
+      G2O_WARN("computeActiveErrors(): found NaN in error for edge {}",
+               static_cast<void*>(e));
     }
   }
 #endif
 }
 
-number_t SparseOptimizer::activeChi2() const {
-  number_t chi = 0.0;
+double SparseOptimizer::activeChi2() const {
+  double chi = 0.0;
   for (EdgeContainer::const_iterator it = _activeEdges.begin();
        it != _activeEdges.end(); ++it) {
     const OptimizableGraph::Edge* e = *it;
@@ -98,9 +114,9 @@ number_t SparseOptimizer::activeChi2() const {
   return chi;
 }
 
-number_t SparseOptimizer::activeRobustChi2() const {
+double SparseOptimizer::activeRobustChi2() const {
   Vector3 rho;
-  number_t chi = 0.0;
+  double chi = 0.0;
   for (EdgeContainer::const_iterator it = _activeEdges.begin();
        it != _activeEdges.end(); ++it) {
     const OptimizableGraph::Edge* e = *it;
@@ -116,13 +132,7 @@ number_t SparseOptimizer::activeRobustChi2() const {
 OptimizableGraph::Vertex* SparseOptimizer::findGauge() {
   if (vertices().empty()) return nullptr;
 
-  int maxDim = 0;
-  for (HyperGraph::VertexIDMap::iterator it = vertices().begin();
-       it != vertices().end(); ++it) {
-    OptimizableGraph::Vertex* v =
-        static_cast<OptimizableGraph::Vertex*>(it->second);
-    maxDim = std::max(maxDim, v->dimension());
-  }
+  int maxDim = maxDimension();
 
   OptimizableGraph::Vertex* rut = 0;
   for (HyperGraph::VertexIDMap::iterator it = vertices().begin();
@@ -140,13 +150,7 @@ OptimizableGraph::Vertex* SparseOptimizer::findGauge() {
 bool SparseOptimizer::gaugeFreedom() {
   if (vertices().empty()) return false;
 
-  int maxDim = 0;
-  for (HyperGraph::VertexIDMap::iterator it = vertices().begin();
-       it != vertices().end(); ++it) {
-    OptimizableGraph::Vertex* v =
-        static_cast<OptimizableGraph::Vertex*>(it->second);
-    maxDim = std::max(maxDim, v->dimension());
-  }
+  int maxDim = maxDimension();
 
   for (HyperGraph::VertexIDMap::iterator it = vertices().begin();
        it != vertices().end(); ++it) {
@@ -213,8 +217,7 @@ bool SparseOptimizer::initializeOptimization(int level) {
 bool SparseOptimizer::initializeOptimization(HyperGraph::VertexSet& vset,
                                              int level) {
   if (edges().size() == 0) {
-    cerr << __PRETTY_FUNCTION__ << ": Attempt to initialize an empty graph"
-         << endl;
+    G2O_WARN("Attempt to initialize an empty graph");
     return false;
   }
   preIteration(-1);
@@ -265,8 +268,7 @@ bool SparseOptimizer::initializeOptimization(HyperGraph::VertexSet& vset,
           int k;
           bool hasNan = arrayHasNaN(estimateData.data(), estimateDim, &k);
           if (hasNan)
-            cerr << __PRETTY_FUNCTION__ << ": Vertex " << v->id()
-                 << " contains a nan entry at index " << k << endl;
+            G2O_WARN("Vertex {} contains a nan entry at index {}", v->id(), k);
         }
       }
 #endif
@@ -355,7 +357,6 @@ void SparseOptimizer::computeInitialGuess(
               static_cast<OptimizableGraph::Edge*>(*vedgeIt);
           if (vedge->vertices().size() == 1 &&
               vedge->initialEstimatePossible(emptySet, v) > 0.) {
-            // cerr << "Initialize with prior for " << v->id() << endl;
             vedge->initialEstimate(emptySet, v);
             fixedVertices.insert(v);
           }
@@ -390,21 +391,27 @@ void SparseOptimizer::computeInitialGuess(
 }
 
 int SparseOptimizer::optimize(int iterations, bool online) {
+  if (_algorithm == nullptr) {
+    G2O_WARN(
+        "No optimization algorithm set, maybe forgot to call "
+        "setAlgorithm()");
+    return -1;
+  }
+
   if (_ivMap.size() == 0) {
-    cerr << __PRETTY_FUNCTION__
-         << ": 0 vertices to optimize, maybe forgot to call "
-            "initializeOptimization()"
-         << endl;
+    G2O_WARN(
+        "0 vertices to optimize, maybe forgot to call "
+        "initializeOptimization()");
     return -1;
   }
 
   int cjIterations = 0;
-  number_t cumTime = 0;
+  double cumTime = 0;
   bool ok = true;
 
   ok = _algorithm->init(online);
   if (!ok) {
-    cerr << __PRETTY_FUNCTION__ << " Error while initializing" << endl;
+    G2O_ERROR("Error while initializing");
     return -1;
   }
 
@@ -423,7 +430,7 @@ int SparseOptimizer::optimize(int iterations, bool online) {
       cstat.numVertices = _activeVertices.size();
     }
 
-    number_t ts = get_monotonic_time();
+    double ts = get_monotonic_time();
     result = _algorithm->solve(i, online);
     ok = (result == OptimizationAlgorithm::OK);
 
@@ -436,7 +443,7 @@ int SparseOptimizer::optimize(int iterations, bool online) {
     }
 
     if (verbose()) {
-      number_t dts = get_monotonic_time() - ts;
+      double dts = get_monotonic_time() - ts;
       cumTime += dts;
       if (!errorComputed) computeActiveErrors();
       cerr << "iteration= " << i << "\t chi2= " << FIXED(activeRobustChi2())
@@ -454,15 +461,13 @@ int SparseOptimizer::optimize(int iterations, bool online) {
   return cjIterations;
 }
 
-void SparseOptimizer::update(const number_t* update) {
+void SparseOptimizer::update(const double* update) {
   // update the graph by calling oplus on the vertices
   for (size_t i = 0; i < _ivMap.size(); ++i) {
     OptimizableGraph::Vertex* v = _ivMap[i];
 #ifndef NDEBUG
     bool hasNan = arrayHasNaN(update, v->dimension());
-    if (hasNan)
-      cerr << __PRETTY_FUNCTION__ << ": Update contains a nan for vertex "
-           << v->id() << endl;
+    if (hasNan) G2O_WARN("Update contains a nan for vertex {}", v->id());
 #endif
     v->oplus(update);
     update += v->dimension();
@@ -508,9 +513,17 @@ bool SparseOptimizer::updateInitialization(HyperGraph::VertexSet& vset,
     }
   }
 
-  // if (newVertices.size() != vset.size())
-  // cerr << __PRETTY_FUNCTION__ << ": something went wrong " <<
-  // PVAR(vset.size()) << " " << PVAR(newVertices.size()) << endl;
+  if (newVertices.size() != vset.size()) {
+    G2O_ERROR("something went wrong, size mismatch {} != {}", vset.size(),
+              newVertices.size());
+  }
+  if (_algorithm == nullptr) {
+    G2O_WARN(
+        "No optimization algorithm set, maybe forgot to call "
+        "setAlgorithm()");
+    return false;
+  }
+
   return _algorithm->updateStructure(newVertices, eset);
 }
 
@@ -556,25 +569,11 @@ void SparseOptimizer::pop(SparseOptimizer::VertexContainer& vlist) {
 }
 
 void SparseOptimizer::push(HyperGraph::VertexSet& vlist) {
-  for (HyperGraph::VertexSet::iterator it = vlist.begin(); it != vlist.end();
-       ++it) {
-    OptimizableGraph::Vertex* v = dynamic_cast<OptimizableGraph::Vertex*>(*it);
-    if (v)
-      v->push();
-    else
-      cerr << __FUNCTION__ << ": FATAL PUSH SET" << endl;
-  }
+  OptimizableGraph::push(vlist);
 }
 
 void SparseOptimizer::pop(HyperGraph::VertexSet& vlist) {
-  for (HyperGraph::VertexSet::iterator it = vlist.begin(); it != vlist.end();
-       ++it) {
-    OptimizableGraph::Vertex* v = dynamic_cast<OptimizableGraph::Vertex*>(*it);
-    if (v)
-      v->pop();
-    else
-      cerr << __FUNCTION__ << ": FATAL POP SET" << endl;
-  }
+  OptimizableGraph::pop(vlist);
 }
 
 void SparseOptimizer::discardTop(SparseOptimizer::VertexContainer& vlist) {
@@ -585,8 +584,12 @@ void SparseOptimizer::discardTop(SparseOptimizer::VertexContainer& vlist) {
 void SparseOptimizer::setVerbose(bool verbose) { _verbose = verbose; }
 
 void SparseOptimizer::setAlgorithm(OptimizationAlgorithm* algorithm) {
-  if (_algorithm)  // reset the optimizer for the formerly used solver
+  if (_algorithm) {
+    // reset the optimizer for the formerly used solver in case release() won't
+    // delete it
     _algorithm->setOptimizer(nullptr);
+    release(_algorithm);
+  }
 
   _algorithm = algorithm;
 
@@ -596,7 +599,35 @@ void SparseOptimizer::setAlgorithm(OptimizationAlgorithm* algorithm) {
 bool SparseOptimizer::computeMarginals(
     SparseBlockMatrix<MatrixX>& spinv,
     const std::vector<std::pair<int, int> >& blockIndices) {
+  if (_algorithm == nullptr) {
+    G2O_WARN(
+        "No optimization algorithm set, maybe forgot to call "
+        "setAlgorithm()");
+    return false;
+  }
+
   return _algorithm->computeMarginals(spinv, blockIndices);
+}
+
+bool SparseOptimizer::computeMarginals(SparseBlockMatrix<MatrixX>& spinv,
+                                       const Vertex* vertex) {
+  if (vertex->hessianIndex() < 0) {
+    return false;
+  }
+  std::vector<std::pair<int, int> > index{
+      std::make_pair<int, int>(vertex->hessianIndex(), vertex->hessianIndex())};
+  return computeMarginals(spinv, index);
+}
+
+bool SparseOptimizer::computeMarginals(SparseBlockMatrix<MatrixX>& spinv,
+                                       const VertexContainer& vertices) {
+  std::vector<std::pair<int, int> > indices;
+  indices.reserve(vertices.size());
+  for (VertexContainer::const_iterator it = vertices.begin();
+       it != vertices.end(); ++it) {
+    indices.emplace_back((*it)->hessianIndex(), (*it)->hessianIndex());
+  }
+  return computeMarginals(spinv, indices);
 }
 
 void SparseOptimizer::setForceStopFlag(bool* flag) { _forceStopFlag = flag; }

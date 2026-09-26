@@ -42,32 +42,44 @@ class G2O_TYPES_SBA_API EdgeStereoSE3ProjectXYZ
 
   EdgeStereoSE3ProjectXYZ();
 
-  bool read(std::istream &is);
+  bool read(std::istream& is);
 
-  bool write(std::ostream &os) const;
+  bool write(std::ostream& os) const;
+
+  virtual bool setMeasurementData(const double* m) {
+    Eigen::Map<const Vector3> v(m);
+    setMeasurement(v);
+    return true;
+  }
+
+  virtual bool getMeasurementData(double* m) const {
+    Eigen::Map<Vector3> v(m);
+    v = measurement();
+    return true;
+  }
+
+  virtual int measurementDimension() const { return 3; }
 
   void computeError() {
-    const VertexSE3Expmap *v1 =
-        static_cast<const VertexSE3Expmap *>(_vertices[1]);
-    const VertexPointXYZ *v2 =
-        static_cast<const VertexPointXYZ *>(_vertices[0]);
+    const VertexSE3Expmap* v1 =
+        static_cast<const VertexSE3Expmap*>(_vertices[1]);
+    const VertexPointXYZ* v2 = static_cast<const VertexPointXYZ*>(_vertices[0]);
     Vector3 obs(_measurement);
     _error = obs - cam_project(v1->estimate().map(v2->estimate()), bf);
   }
 
   bool isDepthPositive() {
-    const VertexSE3Expmap *v1 =
-        static_cast<const VertexSE3Expmap *>(_vertices[1]);
-    const VertexPointXYZ *v2 =
-        static_cast<const VertexPointXYZ *>(_vertices[0]);
+    const VertexSE3Expmap* v1 =
+        static_cast<const VertexSE3Expmap*>(_vertices[1]);
+    const VertexPointXYZ* v2 = static_cast<const VertexPointXYZ*>(_vertices[0]);
     return (v1->estimate().map(v2->estimate()))(2) > 0;
   }
 
   virtual void linearizeOplus();
 
-  Vector3 cam_project(const Vector3 &trans_xyz, const float &bf) const;
+  Vector3 cam_project(const Vector3& trans_xyz, const float& bf) const;
 
-  number_t fx, fy, cx, cy, bf;
+  double fx = 1., fy = 1., cx = 0.5, cy = 0.5, bf = 0;
 };
 
 }  // namespace g2o

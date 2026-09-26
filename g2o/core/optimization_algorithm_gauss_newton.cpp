@@ -26,10 +26,10 @@
 
 #include "optimization_algorithm_gauss_newton.h"
 
-#include <iostream>
+#include <cassert>
 
 #include "batch_stats.h"
-#include "g2o/stuff/macros.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/timeutil.h"
 #include "solver.h"
 #include "sparse_optimizer.h"
@@ -53,7 +53,7 @@ OptimizationAlgorithm::SolverResult OptimizationAlgorithmGaussNewton::solve(
 
   // here so that correct component for max-mixtures can be computed before the
   // build structure
-  number_t t = get_monotonic_time();
+  double t = get_monotonic_time();
   _optimizer->computeActiveErrors();
   G2OBatchStatistics* globalStats = G2OBatchStatistics::globalStats();
   if (globalStats) {
@@ -64,8 +64,7 @@ OptimizationAlgorithm::SolverResult OptimizationAlgorithmGaussNewton::solve(
       !online) {  // built up the CCS structure, here due to easy time measure
     ok = _solver.buildStructure();
     if (!ok) {
-      cerr << __PRETTY_FUNCTION__ << ": Failure while building CCS structure"
-           << endl;
+      G2O_WARN("Failure while building CCS structure");
       return OptimizationAlgorithm::Fail;
     }
   }

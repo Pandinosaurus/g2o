@@ -32,6 +32,7 @@
 #include <limits>
 #include <type_traits>
 
+#include "g2o/stuff/logger.h"
 #include "optimizable_graph.h"
 
 namespace g2o {
@@ -64,8 +65,8 @@ struct QuadraticFormLock {
 template <int D>
 struct BaseEdgeTraits {
   static constexpr int Dimension = D;
-  typedef Eigen::Matrix<number_t, D, 1, Eigen::ColMajor> ErrorVector;
-  typedef Eigen::Matrix<number_t, D, D, Eigen::ColMajor> InformationType;
+  typedef Eigen::Matrix<double, D, 1, Eigen::ColMajor> ErrorVector;
+  typedef Eigen::Matrix<double, D, D, Eigen::ColMajor> InformationType;
 };
 /**
  * Same as above but for dimension not known at compilation, i.e., dynamically
@@ -74,10 +75,8 @@ struct BaseEdgeTraits {
 template <>
 struct BaseEdgeTraits<-1> {
   static constexpr int Dimension = -1;
-  typedef Eigen::Matrix<number_t, Eigen::Dynamic, 1, Eigen::ColMajor>
-      ErrorVector;
-  typedef Eigen::Matrix<number_t, Eigen::Dynamic, Eigen::Dynamic,
-                        Eigen::ColMajor>
+  typedef Eigen::Matrix<double, Eigen::Dynamic, 1, Eigen::ColMajor> ErrorVector;
+  typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>
       InformationType;
 };
 
@@ -92,13 +91,15 @@ class BaseEdge : public OptimizableGraph::Edge {
   typedef typename internal::BaseEdgeTraits<D>::InformationType InformationType;
 
   BaseEdge() : OptimizableGraph::Edge() { _dimension = D; }
+  BaseEdge& operator=(const BaseEdge&) = delete;
+  BaseEdge(const BaseEdge&) = delete;
 
   virtual ~BaseEdge() {}
 
-  virtual number_t chi2() const { return _error.dot(information() * _error); }
+  virtual double chi2() const { return _error.dot(information() * _error); }
 
-  virtual const number_t* errorData() const { return _error.data(); }
-  virtual number_t* errorData() { return _error.data(); }
+  virtual const double* errorData() const { return _error.data(); }
+  virtual double* errorData() { return _error.data(); }
   const ErrorVector& error() const { return _error; }
   ErrorVector& error() { return _error; }
 
@@ -111,10 +112,8 @@ class BaseEdge : public OptimizableGraph::Edge {
     _information = information;
   }
 
-  virtual const number_t* informationData() const {
-    return _information.data();
-  }
-  virtual number_t* informationData() { return _information.data(); }
+  virtual const double* informationData() const { return _information.data(); }
+  virtual double* informationData() { return _information.data(); }
 
   //! accessor functions for the measurement represented by the edge
   EIGEN_STRONG_INLINE const Measurement& measurement() const {
@@ -126,10 +125,9 @@ class BaseEdge : public OptimizableGraph::Edge {
 
   virtual void initialEstimate(const OptimizableGraph::VertexSet&,
                                OptimizableGraph::Vertex*) {
-    std::cerr << "inititialEstimate() is not implemented, please give "
-                 "implementation in your "
-                 "derived class"
-              << std::endl;
+    G2O_WARN(
+        "inititialEstimate() is not implemented, please give implementation in "
+        "your derived class");
   }
 
   /**
@@ -157,9 +155,9 @@ class BaseEdge : public OptimizableGraph::Edge {
    */
   InformationType robustInformation(const Vector3& rho) const {
     InformationType result = rho[1] * _information;
-    // ErrorVector weightedErrror = _information * _error;
-    // result.noalias() += 2 * rho[2] * (weightedErrror *
-    // weightedErrror.transpose());
+    // ErrorVector weightedError = _information * _error;
+    // result.noalias() += 2 * rho[2] * (weightedError *
+    // weightedError.transpose());
     return result;
   }
 
@@ -173,12 +171,12 @@ class BaseEdge : public OptimizableGraph::Edge {
   //! reads the upper triangular part of the matrix and recovers the missing
   //! symmetrical elements
   bool readInformationMatrix(std::istream& is) {
-    for (int i = 0; i < information().rows() && is.good(); ++i)
-      for (int j = i; j < information().cols() && is.good(); ++j) {
+    for (int i = 0; i < information().rows() && !is.fail(); ++i)
+      for (int j = i; j < information().cols() && !is.fail(); ++j) {
         is >> information()(i, j);
         if (i != j) information()(j, i) = information()(i, j);
       }
-    return is.good() || is.eof();
+    return !is.fail();
   }
   //! write the param IDs that are potentially used by the edge
   bool writeParamIds(std::ostream& os) const {
@@ -192,7 +190,7 @@ class BaseEdge : public OptimizableGraph::Edge {
       is >> paramId;
       setParameterId(i, paramId);
     }
-    return is.good() || is.eof();
+    return !is.fail();
   }
 
  public:

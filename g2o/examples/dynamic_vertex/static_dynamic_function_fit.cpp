@@ -224,20 +224,20 @@ int main(int argc, const char* argv[]) {
 
   // Construct the graph and set up the solver and optimiser
   std::unique_ptr<g2o::BlockSolverX::LinearSolverType> linearSolver =
-      g2o::make_unique<
+      std::make_unique<
           g2o::LinearSolverEigen<g2o::BlockSolverX::PoseMatrixType>>();
 
   // Set up the solver
   std::unique_ptr<g2o::BlockSolverX> blockSolver =
-      g2o::make_unique<g2o::BlockSolverX>(move(linearSolver));
+      std::make_unique<g2o::BlockSolverX>(std::move(linearSolver));
 
   // Set up the optimisation algorithm
   g2o::OptimizationAlgorithm* optimisationAlgorithm =
-      new g2o::OptimizationAlgorithmLevenberg(move(blockSolver));
+      new g2o::OptimizationAlgorithmLevenberg(std::move(blockSolver));
 
   // Create the graph and configure it
   std::unique_ptr<g2o::SparseOptimizer> optimizer =
-      g2o::make_unique<g2o::SparseOptimizer>();
+      std::make_unique<g2o::SparseOptimizer>();
   optimizer->setVerbose(true);
   optimizer->setAlgorithm(optimisationAlgorithm);
 

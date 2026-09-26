@@ -28,7 +28,7 @@
 #define G2O_TYPES_ICP
 
 #define GICP_ANALYTIC_JACOBIANS
-//#define SCAM_ANALYTIC_JACOBIANS
+// #define SCAM_ANALYTIC_JACOBIANS
 
 #include <Eigen/Geometry>
 #include <iostream>
@@ -84,12 +84,19 @@ class G2O_TYPES_ICP_API EdgeGICP {
     y << 0, 1, 0;
     R0.row(2) = normal0;
     y = y - normal0(1) * normal0;
-    y.normalize();  // need to check if y is close to 0
-    R0.row(1) = y;
-    R0.row(0) = normal0.cross(R0.row(1));
-    //      cout << normal.transpose() << endl;
-    //      cout << R0 << endl << endl;
-    //      cout << R0*R0.transpose() << endl << endl;
+    double ysquarednorm = y.squaredNorm();
+    if (ysquarednorm >= ySquaredBnd) {
+      y /= std::sqrt(ysquarednorm);
+      R0.row(1) = y;
+      R0.row(0) = normal0.cross(R0.row(1));
+    } else {
+      Vector3 x;
+      x << -1, 0, 0;
+      x = x + normal0(0) * normal0;
+      x.normalize();
+      R0.row(0) = x;
+      R0.row(1) = -normal0.cross(R0.row(0));
+    }
   }
 
   // set up rotation matrix for pos1
@@ -98,13 +105,23 @@ class G2O_TYPES_ICP_API EdgeGICP {
     y << 0, 1, 0;
     R1.row(2) = normal1;
     y = y - normal1(1) * normal1;
-    y.normalize();  // need to check if y is close to 0
-    R1.row(1) = y;
-    R1.row(0) = normal1.cross(R1.row(1));
+    double ysquarednorm = y.squaredNorm();
+    if (y.squaredNorm() >= ySquaredBnd) {
+      y /= std::sqrt(ysquarednorm);
+      R1.row(1) = y;
+      R1.row(0) = normal1.cross(R1.row(1));
+    } else {
+      Vector3 x;
+      x << -1, 0, 0;
+      x = x + normal1(0) * normal1;
+      x.normalize();
+      R1.row(0) = x;
+      R1.row(1) = -normal1.cross(R1.row(0));
+    }
   }
 
   // returns a precision matrix for point-plane
-  Matrix3 prec0(number_t e) {
+  Matrix3 prec0(double e) {
     makeRot0();
     Matrix3 prec;
     prec << e, 0, 0, 0, e, 0, 0, 0, 1;
@@ -112,7 +129,7 @@ class G2O_TYPES_ICP_API EdgeGICP {
   }
 
   // returns a precision matrix for point-plane
-  Matrix3 prec1(number_t e) {
+  Matrix3 prec1(double e) {
     makeRot1();
     Matrix3 prec;
     prec << e, 0, 0, 0, e, 0, 0, 0, 1;
@@ -120,7 +137,7 @@ class G2O_TYPES_ICP_API EdgeGICP {
   }
 
   // return a covariance matrix for plane-plane
-  Matrix3 cov0(number_t e) {
+  Matrix3 cov0(double e) {
     makeRot0();
     Matrix3 cov;
     cov << 1, 0, 0, 0, 1, 0, 0, 0, e;
@@ -128,12 +145,15 @@ class G2O_TYPES_ICP_API EdgeGICP {
   }
 
   // return a covariance matrix for plane-plane
-  Matrix3 cov1(number_t e) {
+  Matrix3 cov1(double e) {
     makeRot1();
     Matrix3 cov;
     cov << 1, 0, 0, 0, 1, 0, 0, 0, e;
     return R1.transpose() * cov * R1;
   }
+
+  // this parameter is used by makeRot0 and makeRot1
+  static constexpr double ySquaredBnd{0.1};
 };
 
 // 3D rigid constraint
@@ -145,21 +165,21 @@ class G2O_TYPES_ICP_API Edge_V_V_GICP
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   Edge_V_V_GICP() : pl_pl(false) {}
-  Edge_V_V_GICP(const Edge_V_V_GICP *e);
+  Edge_V_V_GICP(const Edge_V_V_GICP* e);
 
   // switch to go between point-plane and plane-plane
   bool pl_pl;
   Matrix3 cov0, cov1;
 
   // I/O functions
-  virtual bool read(std::istream &is);
-  virtual bool write(std::ostream &os) const;
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
   // return the error estimate as a 3-vector
   void computeError() {
     // from <ViewPoint> to <Point>
-    const VertexSE3 *vp0 = static_cast<const VertexSE3 *>(_vertices[0]);
-    const VertexSE3 *vp1 = static_cast<const VertexSE3 *>(_vertices[1]);
+    const VertexSE3* vp0 = static_cast<const VertexSE3*>(_vertices[0]);
+    const VertexSE3* vp1 = static_cast<const VertexSE3*>(_vertices[1]);
 
     // get vp1 point into vp0 frame
     // could be more efficient if we computed this transform just once
@@ -232,23 +252,23 @@ class G2O_TYPES_ICP_API VertexSCam : public VertexSE3 {
   VertexSCam();
 
   // I/O
-  virtual bool read(std::istream &is);
-  virtual bool write(std::ostream &os) const;
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
   // capture the update function to reset aux transforms
-  virtual void oplusImpl(const number_t *update) {
+  virtual void oplusImpl(const double* update) {
     VertexSE3::oplusImpl(update);
     setAll();
   }
 
   // camera matrix and stereo baseline
   static Matrix3 Kcam;
-  static number_t baseline;
+  static double baseline;
 
   // transformations
-  Eigen::Matrix<number_t, 3, 4, Eigen::ColMajor>
+  Eigen::Matrix<double, 3, 4, Eigen::ColMajor>
       w2n;  // transform from world to node coordinates
-  Eigen::Matrix<number_t, 3, 4, Eigen::ColMajor>
+  Eigen::Matrix<double, 3, 4, Eigen::ColMajor>
       w2i;  // transform from world to image coordinates
 
   // Derivatives of the rotation matrix transpose wrt quaternion xyz, used for
@@ -256,8 +276,8 @@ class G2O_TYPES_ICP_API VertexSCam : public VertexSE3 {
   Matrix3 dRdx, dRdy, dRdz;
 
   // transforms
-  static void transformW2F(Eigen::Matrix<number_t, 3, 4, Eigen::ColMajor> &m,
-                           const Vector3 &trans, const Quaternion &qrot) {
+  static void transformW2F(Eigen::Matrix<double, 3, 4, Eigen::ColMajor>& m,
+                           const Vector3& trans, const Quaternion& qrot) {
     m.block<3, 3>(0, 0) = qrot.toRotationMatrix().transpose();
     m.col(3).setZero();  // make sure there's no translation
     Vector4 tt;
@@ -266,15 +286,14 @@ class G2O_TYPES_ICP_API VertexSCam : public VertexSE3 {
     m.col(3) = -m * tt;
   }
 
-  static void transformF2W(Eigen::Matrix<number_t, 3, 4, Eigen::ColMajor> &m,
-                           const Vector3 &trans, const Quaternion &qrot) {
+  static void transformF2W(Eigen::Matrix<double, 3, 4, Eigen::ColMajor>& m,
+                           const Vector3& trans, const Quaternion& qrot) {
     m.block<3, 3>(0, 0) = qrot.toRotationMatrix();
     m.col(3) = trans;
   }
 
   // set up camera matrix
-  static void setKcam(number_t fx, number_t fy, number_t cx, number_t cy,
-                      number_t tx) {
+  static void setKcam(double fx, double fy, double cx, double cy, double tx) {
     Kcam.setZero();
     Kcam(0, 0) = fx;
     Kcam(1, 1) = fy;
@@ -312,7 +331,7 @@ class G2O_TYPES_ICP_API VertexSCam : public VertexSE3 {
   }
 
   // calculate stereo projection
-  void mapPoint(Vector3 &res, const Vector3 &pt3) {
+  void mapPoint(Vector3& res, const Vector3& pt3) {
     Vector4 pt;
     pt.head<3>() = pt3;
     pt(3) = cst(1.0);
@@ -320,7 +339,7 @@ class G2O_TYPES_ICP_API VertexSCam : public VertexSE3 {
     Vector3 p2 = w2n * pt;
     Vector3 pb(baseline, 0, 0);
 
-    number_t invp1 = cst(1.0) / p1(2);
+    double invp1 = cst(1.0) / p1(2);
     res.head<2>() = p1.head<2>() * invp1;
 
     // right camera px
@@ -346,15 +365,15 @@ class G2O_TYPES_ICP_API Edge_XYZ_VSC
 
   Edge_XYZ_VSC();
 
-  virtual bool read(std::istream &is);
-  virtual bool write(std::ostream &os) const;
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
   // return the error estimate as a 2-vector
   void computeError() {
     // from <Point> to <Cam>
-    const VertexPointXYZ *point =
-        static_cast<const VertexPointXYZ *>(_vertices[0]);
-    VertexSCam *cam = static_cast<VertexSCam *>(_vertices[1]);
+    const VertexPointXYZ* point =
+        static_cast<const VertexPointXYZ*>(_vertices[0]);
+    VertexSCam* cam = static_cast<VertexSCam*>(_vertices[1]);
     // cam->setAll();
 
     // calculate the projection

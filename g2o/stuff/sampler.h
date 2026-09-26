@@ -39,9 +39,9 @@
 
 namespace g2o {
 
-number_t G2O_STUFF_API sampleUniform(number_t min = 0, number_t max = 1,
-                                     std::mt19937* generator = 0);
-number_t G2O_STUFF_API sampleGaussian(std::mt19937* generator = 0);
+double G2O_STUFF_API sampleUniform(double min = 0, double max = 1,
+                                   std::mt19937* generator = 0);
+double G2O_STUFF_API sampleGaussian(std::mt19937* generator = 0);
 
 template <class SampleType, class CovarianceType>
 class GaussianSampler {
@@ -69,7 +69,7 @@ class GaussianSampler {
   }
   //! seed the random number generator, returns false if not having an own
   //! generator.
-  bool seed(int s) {
+  bool seed(unsigned int s) {
     if (!_generator) return false;
     _generator->seed(s);
     return true;
@@ -86,22 +86,22 @@ class G2O_STUFF_API Sampler {
    * Gaussian random with a mean and standard deviation. Uses the
    * Polar method of Marsaglia.
    */
-  static number_t gaussRand(number_t mean, number_t sigma) {
-    number_t y, r2;
+  static double gaussRand(double mean, double sigma) {
+    double y, r2;
     do {
-      number_t x = -1.0 + 2.0 * uniformRand(0.0, 1.0);
+      double x = -1.0 + 2.0 * uniformRand(0.0, 1.0);
       y = -1.0 + 2.0 * uniformRand(0.0, 1.0);
       r2 = x * x + y * y;
     } while (r2 > 1.0 || r2 == 0.0);
     return mean + sigma * y * std::sqrt(-2.0 * log(r2) / r2);
-  }
+  }  // namespace g2o
 
   /**
    * sample a number from a uniform distribution
    */
-  static number_t uniformRand(number_t lowerBndr, number_t upperBndr) {
+  static double uniformRand(double lowerBndr, double upperBndr) {
     return lowerBndr +
-           ((number_t)std::rand() / (RAND_MAX + 1.0)) * (upperBndr - lowerBndr);
+           ((double)std::rand() / (RAND_MAX + 1.0)) * (upperBndr - lowerBndr);
   }
   /**
    * default seed function using the current time in seconds

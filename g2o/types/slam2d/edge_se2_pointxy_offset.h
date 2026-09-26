@@ -52,23 +52,23 @@ class G2O_TYPES_SLAM2D_API EdgeSE2PointXYOffset
 
   virtual void setMeasurement(const Vector2& m) { _measurement = m; }
 
-  virtual bool setMeasurementData(const number_t* d) {
+  virtual bool setMeasurementData(const double* d) {
     Eigen::Map<const Vector2> v(d);
     _measurement = v;
     return true;
   }
 
-  virtual bool getMeasurementData(number_t* d) const {
+  virtual bool getMeasurementData(double* d) const {
     Eigen::Map<Vector2> v(d);
     v = _measurement;
     return true;
   }
 
-  virtual int measurementDimension() const { return 3; }
+  virtual int measurementDimension() const { return 2; }
 
   virtual bool setMeasurementFromState();
 
-  virtual number_t initialEstimatePossible(
+  virtual double initialEstimatePossible(
       const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to) {
     (void)to;
     return (from.count(_vertices[0]) == 1 ? 1.0 : -1.0);

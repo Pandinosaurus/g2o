@@ -36,14 +36,9 @@
 namespace g2o {
 
 class EdgeSE2Segment2D
-    : public BaseBinaryEdge<4, Vector4, VertexSE2,
-                            VertexSegment2D>  // Avoid redefinition of BaseEdge
-                                              // in MSVC
-{
+    : public BaseBinaryEdge<4, Vector4, VertexSE2, VertexSegment2D> {
  public:
-  G2O_TYPES_SLAM2D_ADDONS_API EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-      G2O_TYPES_SLAM2D_ADDONS_API
-      EdgeSE2Segment2D();
+  G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Segment2D();
 
   G2O_TYPES_SLAM2D_ADDONS_API Vector2 measurementP1() {
     return Eigen::Map<const Vector2>(&(_measurement[0]));
@@ -72,15 +67,13 @@ class EdgeSE2Segment2D
     _error = _error - _measurement;
   }
 
-  G2O_TYPES_SLAM2D_ADDONS_API virtual bool setMeasurementData(
-      const number_t* d) {
+  G2O_TYPES_SLAM2D_ADDONS_API virtual bool setMeasurementData(const double* d) {
     Eigen::Map<const Vector4> data(d);
     _measurement = data;
     return true;
   }
 
-  G2O_TYPES_SLAM2D_ADDONS_API virtual bool getMeasurementData(
-      number_t* d) const {
+  G2O_TYPES_SLAM2D_ADDONS_API virtual bool getMeasurementData(double* d) const {
     Eigen::Map<Vector4> data(d);
     data = _measurement;
     return true;
@@ -105,35 +98,12 @@ class EdgeSE2Segment2D
 
   G2O_TYPES_SLAM2D_ADDONS_API virtual void initialEstimate(
       const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to);
-  G2O_TYPES_SLAM2D_ADDONS_API virtual number_t initialEstimatePossible(
+  G2O_TYPES_SLAM2D_ADDONS_API virtual double initialEstimatePossible(
       const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to) {
     (void)to;
     return (from.count(_vertices[0]) == 1 ? 1.0 : -1.0);
   }
-  /* #ifndef NUMERIC_JACOBIAN_TWO_D_TYPES */
-  /*       virtual void linearizeOplus(); */
-  /* #endif */
 };
-
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Segment2DWriteGnuplotAction:
- * public WriteGnuplotAction { */
-/*   public: */
-/*     EdgeSE2Segment2DWriteGnuplotAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-
-/* #ifdef G2O_HAVE_OPENGL */
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Segment2DDrawAction: public
- * DrawAction{ */
-/*   public: */
-/*     EdgeSE2Segment2DDrawAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-/* #endif */
 
 }  // namespace g2o
 

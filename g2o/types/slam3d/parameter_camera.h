@@ -39,7 +39,7 @@ class G2O_TYPES_SLAM3D_API ParameterCamera : public ParameterSE3Offset {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   ParameterCamera();
-  void setKcam(number_t fx, number_t fy, number_t cx, number_t cy);
+  void setKcam(double fx, double fy, double cx, double cy);
   void setOffset(const Isometry3& offset_ = Isometry3::Identity());
 
   virtual bool read(std::istream& is);
@@ -65,7 +65,7 @@ class G2O_TYPES_SLAM3D_API CacheCamera : public CacheSE3Offset {
 
  protected:
   virtual void updateImpl();
-  virtual bool resolveDependancies();
+  virtual bool resolveDependencies();
   Affine3 _w2i;  ///< world to image transform
   ParameterCamera* params;
 };

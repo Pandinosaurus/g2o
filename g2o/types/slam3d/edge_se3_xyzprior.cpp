@@ -26,6 +26,8 @@
 
 #include "edge_se3_xyzprior.h"
 
+#include <cassert>
+
 namespace g2o {
 
 EdgeSE3XYZPrior::EdgeSE3XYZPrior()
@@ -48,8 +50,8 @@ bool EdgeSE3XYZPrior::resolveCaches() {
 }
 
 bool EdgeSE3XYZPrior::read(std::istream& is) {
-  readParamIds(is);
-  internal::readVector(is, _measurement);
+  if (!readParamIds(is)) return false;
+  if (!internal::readVector(is, _measurement)) return false;
   return readInformationMatrix(is);
 }
 

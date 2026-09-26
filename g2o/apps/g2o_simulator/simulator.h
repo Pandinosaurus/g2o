@@ -49,7 +49,7 @@ class G2O_SIMULATOR_API BaseWorldObject {
   }
   virtual ~BaseWorldObject();
   void setWorld(World* world_) { _world = world_; }
-  World* world() { return _world; }
+  World* world() const { return _world; }
   OptimizableGraph* graph();
   OptimizableGraph::Vertex* vertex() { return _vertex; }
   virtual void setVertex(OptimizableGraph::Vertex* vertex_);
@@ -87,9 +87,9 @@ class G2O_SIMULATOR_API BaseRobot {
     _name = name_;
   }
   void setWorld(World* world_) { _world = world_; }
-  World* world() { return _world; }
+  World* world() const { return _world; }
   const std::string& name() const { return _name; }
-  OptimizableGraph* graph();
+  OptimizableGraph* graph() const;
   bool addSensor(BaseSensor* sensor);
   const std::set<BaseSensor*> sensors() { return _sensors; }
   virtual void sense();
@@ -161,9 +161,9 @@ class G2O_SIMULATOR_API BaseSensor {
   BaseSensor(const std::string& name_) { _name = name_; }
   inline BaseRobot* robot() { return _robot; }
   inline void setRobot(BaseRobot* robot_) { _robot = robot_; }
-  World* world();
-  OptimizableGraph* graph();
-  std::vector<Parameter*> parameters() { return _parameters; }
+  World* world() const;
+  OptimizableGraph* graph() const;
+  const std::vector<Parameter*>& parameters() { return _parameters; }
   virtual void sense() = 0;
   virtual void addParameters() {}
 
@@ -228,7 +228,7 @@ class UnarySensor : public BaseSensor {
     return e;
   }
   GaussianSampler<typename EdgeType::ErrorVector, InformationType> _sampler;
-  virtual void addNoise(EdgeType*){};
+  virtual void addNoise(EdgeType*) {};
 };
 
 template <class RobotType_, class EdgeType_, class WorldObjectType_>
@@ -296,7 +296,7 @@ class BinarySensor : public BaseSensor {
     return e;
   }
   GaussianSampler<typename EdgeType::ErrorVector, InformationType> _sampler;
-  virtual void addNoise(EdgeType*){};
+  virtual void addNoise(EdgeType*) {};
 };
 
 }  // namespace g2o

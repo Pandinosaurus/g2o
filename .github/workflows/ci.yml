@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - master
+      - pymem
   pull_request:
-    types: [ assigned, opened, synchronize, reopened ]
+
   release:
 
 jobs:
@@ -28,18 +29,10 @@ jobs:
             build_type: "Debug",
             do_coverage: "OFF",
           }
-        #- {
-            #name: "Windows Latest MSVC",
-            #os: windows-latest,
-            #build_type: "Debug",
-            #environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
-            #generators: "Visual Studio 16 2019"
-            #do_coverage: "OFF",
-          #}
 
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
         with:
             fetch-depth: 25
 
@@ -50,24 +43,33 @@ jobs:
           echo github.event_name: ${{github.event_name}}
           echo runner.os: ${{runner.os}}
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.config.os }}-${{ matrix.config.build_type }}
+          max-size: 2000M
+
       - name: Install dependencies on Ubuntu
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install libeigen3-dev qtdeclarative5-dev qt5-qmake libqglviewer-dev-qt5 libsuitesparse-dev lcov
+          sudo apt update
+          sudo apt install libeigen3-dev qtdeclarative5-dev qt5-qmake libqglviewer-dev-qt5 libsuitesparse-dev lcov libspdlog-dev
 
       - name: Install dependencies on macOS
         if: runner.os == 'macOS'
-        run: brew install cmake eigen
+        run: brew install eigen coreutils
 
-      #- name: Install dependencies on Windows
-        #if: runner.os == 'Windows'
-        #run: brew install cmake eigen
+      - name: Configure ccache for macOS
+        if: runner.os == 'macOS'
+        run: |
+          # See https://github.com/hendrikmuhs/ccache-action/issues/146
+          ccache --set-config=compiler_check=content
 
       - name: Configure CMake
         run: |
+          echo "number of cores: $(nproc) $(nproc --all)"
           cmake --version
-          cmake -B ${{github.workspace}}/build -DBUILD_UNITTESTS=ON -DBUILD_CODE_COVERAGE=${{matrix.config.do_coverage}} -DCMAKE_BUILD_TYPE=${{matrix.config.build_type}}
+          cmake -B ${{github.workspace}}/build -DBUILD_UNITTESTS=ON -DBUILD_CODE_COVERAGE=${{matrix.config.do_coverage}} -DCMAKE_BUILD_TYPE=${{matrix.config.build_type}} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build Introspection
         shell: bash
@@ -78,7 +80,7 @@ jobs:
           env | sort
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{matrix.config.build_type}} -j 2
+        run: cmake --build ${{github.workspace}}/build --config ${{matrix.config.build_type}} -j $(nproc)
 
       - name: Test
         working-directory: ${{github.workspace}}/build
@@ -86,4 +88,6 @@ jobs:
 
       - name: Coverage
         if: matrix.config.do_coverage == 'ON'
-        run: bash ${{github.workspace}}/build/codecov.sh
+        uses: codecov/codecov-action@v7.1.1
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

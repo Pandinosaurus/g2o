@@ -28,18 +28,20 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdarg>
-#include <cstdio>
-#include <cstring>
 #include <iostream>
 #include <iterator>
 #include <string>
 
-#include "macros.h"
-#include "os_specific.h"
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
-#if (defined(UNIX) || defined(CYGWIN)) && !defined(ANDROID)
+#if (defined(UNIX) || defined(CYGWIN)) && \
+    !(defined(ANDROID) || TARGET_IPHONE_SIMULATOR || TARGET_OS_IPHONE)
+#define HAS_WORDEXP
 #include <wordexp.h>
+#else
+#include "g2o/stuff/logger.h"
 #endif
 
 namespace g2o {
@@ -72,47 +74,22 @@ std::string trimRight(const std::string& s) {
 
 std::string strToLower(const std::string& s) {
   string ret;
+  ret.reserve(s.size());
   std::transform(s.begin(), s.end(), back_inserter(ret),
-                 (int (*)(int))std::tolower);
+                 [](unsigned char c) { return std::tolower(c); });
   return ret;
 }
 
 std::string strToUpper(const std::string& s) {
   string ret;
+  ret.reserve(s.size());
   std::transform(s.begin(), s.end(), back_inserter(ret),
-                 (int (*)(int))std::toupper);
+                 [](unsigned char c) { return std::toupper(c); });
   return ret;
 }
 
-std::string formatString(const char* fmt, ...) {
-  char* auxPtr = NULL;
-  va_list arg_list;
-  va_start(arg_list, fmt);
-  int numChar = vasprintf(&auxPtr, fmt, arg_list);
-  va_end(arg_list);
-  string retString;
-  if (numChar != -1)
-    retString = auxPtr;
-  else {
-    cerr << __PRETTY_FUNCTION__ << ": Error while allocating memory" << endl;
-  }
-  free(auxPtr);
-  return retString;
-}
-
-int strPrintf(std::string& str, const char* fmt, ...) {
-  char* auxPtr = NULL;
-  va_list arg_list;
-  va_start(arg_list, fmt);
-  int numChars = vasprintf(&auxPtr, fmt, arg_list);
-  va_end(arg_list);
-  str = auxPtr;
-  free(auxPtr);
-  return numChars;
-}
-
 std::string strExpandFilename(const std::string& filename) {
-#if (defined(UNIX) || defined(CYGWIN)) && !defined(ANDROID)
+#ifdef HAS_WORDEXP
   string result = filename;
   wordexp_t p;
 
@@ -124,8 +101,7 @@ std::string strExpandFilename(const std::string& filename) {
   return result;
 #else
   (void)filename;
-  std::cerr << "WARNING: " << __PRETTY_FUNCTION__ << " not implemented"
-            << std::endl;
+  G2O_WARN("not implemented");
   return std::string();
 #endif
 }
@@ -163,8 +139,16 @@ int readLine(std::istream& is, std::stringstream& currentLine) {
   is.get(*currentLine.rdbuf());
   if (is.fail())  // fail is set on empty lines
     is.clear();
-  G2O_FSKIP_LINE(is);  // read \n not read by get()
+  skipLine(is);  // read \n not read by get()
+  if (currentLine.str().empty() && is.eof()) {
+    return -1;
+  }
   return static_cast<int>(currentLine.str().size());
+}
+
+void skipLine(std::istream& is) {
+  char c = ' ';
+  while (c != '\n' && is.good() && !is.eof()) is.get(c);
 }
 
 }  // namespace g2o

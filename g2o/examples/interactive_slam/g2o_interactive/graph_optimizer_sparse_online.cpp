@@ -26,14 +26,12 @@
 
 #include "graph_optimizer_sparse_online.h"
 
-#include <fstream>
-#include <iomanip>
 #include <iostream>
 
 #include "g2o/core/block_solver.h"
 #include "g2o/core/optimization_algorithm_factory.h"
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
-#include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include "g2o/solvers/cholmod/linear_solver_cholmod.h"  // IWYU pragma: keep
 #include "g2o/solvers/pcg/linear_solver_pcg.h"
 #include "g2o/stuff/macros.h"
 #include "types_slam2d_online.h"
@@ -50,10 +48,10 @@ std::unique_ptr<g2o::Solver> AllocatePCGSolver() {
   std::cerr << "# Using PCG online poseDim " << p << " landMarkDim " << l
             << " blockordering 1" << std::endl;
 
-  auto linearSolver = g2o::make_unique<
+  auto linearSolver = std::make_unique<
       LinearSolverPCG<typename BlockSolverPL<p, l>::PoseMatrixType>>();
   linearSolver->setMaxIterations(6);
-  return g2o::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
+  return std::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
 }
 }  // namespace
 
@@ -92,8 +90,7 @@ int SparseOptimizerOnline::optimize(int iterations, bool online) {
   if (!online) {
     ok = _underlyingSolver->buildStructure();
     if (!ok) {
-      cerr << __PRETTY_FUNCTION__ << ": Failure while building CCS structure"
-           << endl;
+      G2O_ERROR("Failure while building CCS structure");
       return 0;
     }
   }

@@ -26,6 +26,7 @@
 
 #include "jacobian_workspace.h"
 
+#include <cassert>
 #include <cmath>
 
 #include "optimizable_graph.h"
@@ -40,8 +41,6 @@ JacobianWorkspace::JacobianWorkspace()
 JacobianWorkspace::~JacobianWorkspace() {}
 
 bool JacobianWorkspace::allocate() {
-  // cerr << __PRETTY_FUNCTION__ << " " << PVAR(this) << " " <<
-  // PVAR(_maxNumVertices) << " " << PVAR(_maxDimension) << endl;
   if (_maxNumVertices <= 0 || _maxDimension <= 0) return false;
   _workspace.resize(_maxNumVertices);
   for (WorkspaceVector::iterator it = _workspace.begin();
@@ -61,24 +60,25 @@ void JacobianWorkspace::updateSize(const HyperGraph::Edge* e_, bool reset) {
     _maxNumVertices = -1;
     _maxDimension = -1;
   }
+  updateSize(e_);
+}
 
+void JacobianWorkspace::updateSize(const HyperGraph::Edge* e_) {
   const OptimizableGraph::Edge* e =
       static_cast<const OptimizableGraph::Edge*>(e_);
   int errorDimension = e->dimension();
   int numVertices = e->vertices().size();
   int maxDimensionForEdge = -1;
 
-  for (int i = 0; i < numVertices; ++i) {
+  for (const auto& vv : e->vertices()) {
     const OptimizableGraph::Vertex* v =
-        static_cast<const OptimizableGraph::Vertex*>(e->vertex(i));
+        static_cast<const OptimizableGraph::Vertex*>(vv);
     assert(v && "Edge has no vertex assigned");
     maxDimensionForEdge =
         max(v->dimension() * errorDimension, maxDimensionForEdge);
   }
   _maxNumVertices = max(numVertices, _maxNumVertices);
   _maxDimension = max(maxDimensionForEdge, _maxDimension);
-  // cerr << __PRETTY_FUNCTION__ << " " << PVAR(this) << " " <<
-  // PVAR(_maxNumVertices) << " " << PVAR(_maxDimension) << endl;
 }
 
 void JacobianWorkspace::updateSize(const OptimizableGraph& graph, bool reset) {

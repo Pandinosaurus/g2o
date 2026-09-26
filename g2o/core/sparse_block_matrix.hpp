@@ -24,6 +24,8 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cassert>
+
 namespace g2o {
 
 template <class MatrixType>
@@ -156,7 +158,7 @@ template <class MatrixType>
 template <class MatrixTransposedType>
 std::unique_ptr<SparseBlockMatrix<MatrixTransposedType>>
 SparseBlockMatrix<MatrixType>::transposed() const {
-  auto dest = g2o::make_unique<SparseBlockMatrix<MatrixTransposedType>>(
+  auto dest = std::make_unique<SparseBlockMatrix<MatrixTransposedType>>(
       &_colBlockIndices[0], &_rowBlockIndices[0], _colBlockIndices.size(),
       _rowBlockIndices.size());
   transpose_internal(*dest);
@@ -198,7 +200,7 @@ bool SparseBlockMatrix<MatrixType>::add(
 template <class MatrixType>
 std::unique_ptr<SparseBlockMatrix<MatrixType>>
 SparseBlockMatrix<MatrixType>::added() const {
-  auto a = g2o::make_unique<SparseBlockMatrix>(
+  auto a = std::make_unique<SparseBlockMatrix>(
       &_rowBlockIndices[0], &_colBlockIndices[0], _rowBlockIndices.size(),
       _colBlockIndices.size());
   add_internal(*a);
@@ -250,12 +252,12 @@ bool SparseBlockMatrix<MatrixType>::multiply(
 }
 
 template <class MatrixType>
-void SparseBlockMatrix<MatrixType>::multiply(number_t*& dest,
-                                             const number_t* src) const {
+void SparseBlockMatrix<MatrixType>::multiply(double*& dest,
+                                             const double* src) const {
   if (!dest) {
-    dest = new number_t[_rowBlockIndices[_rowBlockIndices.size() - 1]];
+    dest = new double[_rowBlockIndices[_rowBlockIndices.size() - 1]];
     memset(dest, 0,
-           _rowBlockIndices[_rowBlockIndices.size() - 1] * sizeof(number_t));
+           _rowBlockIndices[_rowBlockIndices.size() - 1] * sizeof(double));
   }
 
   // map the memory by Eigen
@@ -281,11 +283,11 @@ void SparseBlockMatrix<MatrixType>::multiply(number_t*& dest,
 
 template <class MatrixType>
 void SparseBlockMatrix<MatrixType>::multiplySymmetricUpperTriangle(
-    number_t*& dest, const number_t* src) const {
+    double*& dest, const double* src) const {
   if (!dest) {
-    dest = new number_t[_rowBlockIndices[_rowBlockIndices.size() - 1]];
+    dest = new double[_rowBlockIndices[_rowBlockIndices.size() - 1]];
     memset(dest, 0,
-           _rowBlockIndices[_rowBlockIndices.size() - 1] * sizeof(number_t));
+           _rowBlockIndices[_rowBlockIndices.size() - 1] * sizeof(double));
   }
 
   // map the memory by Eigen
@@ -315,13 +317,13 @@ void SparseBlockMatrix<MatrixType>::multiplySymmetricUpperTriangle(
 }
 
 template <class MatrixType>
-void SparseBlockMatrix<MatrixType>::rightMultiply(number_t*& dest,
-                                                  const number_t* src) const {
+void SparseBlockMatrix<MatrixType>::rightMultiply(double*& dest,
+                                                  const double* src) const {
   int destSize = cols();
 
   if (!dest) {
-    dest = new number_t[destSize];
-    memset(dest, 0, destSize * sizeof(number_t));
+    dest = new double[destSize];
+    memset(dest, 0, destSize * sizeof(double));
   }
 
   // map the memory by Eigen
@@ -348,7 +350,7 @@ void SparseBlockMatrix<MatrixType>::rightMultiply(number_t*& dest,
 }
 
 template <class MatrixType>
-void SparseBlockMatrix<MatrixType>::scale(number_t a_) {
+void SparseBlockMatrix<MatrixType>::scale(double a_) {
   for (size_t i = 0; i < _blockCols.size(); ++i) {
     for (typename SparseBlockMatrix<MatrixType>::IntBlockMap::const_iterator
              it = _blockCols[i].begin();
@@ -362,15 +364,15 @@ void SparseBlockMatrix<MatrixType>::scale(number_t a_) {
 template <class MatrixType>
 SparseBlockMatrix<MatrixType>* SparseBlockMatrix<MatrixType>::slice(
     int rmin, int rmax, int cmin, int cmax, bool alloc) const {
-  int m = rmax - rmin;
-  int n = cmax - cmin;
-  int rowIdx[m];
+  const int m = rmax - rmin;
+  const int n = cmax - cmin;
+  std::vector<int> rowIdx(m);
   rowIdx[0] = rowsOfBlock(rmin);
   for (int i = 1; i < m; ++i) {
     rowIdx[i] = rowIdx[i - 1] + rowsOfBlock(rmin + i);
   }
 
-  int colIdx[n];
+  std::vector<int> colIdx(n);
   colIdx[0] = colsOfBlock(cmin);
   for (int i = 1; i < n; ++i) {
     colIdx[i] = colIdx[i - 1] + colsOfBlock(cmin + i);
@@ -482,7 +484,6 @@ bool SparseBlockMatrix<MatrixType>::symmPermutation(
   }
   // now ready to permute the columns
   for (size_t i = 0; i < n; ++i) {
-    // cerr << PVAR(i) <<  " ";
     int pi = pinv[i];
     for (typename SparseBlockMatrix<MatrixType>::IntBlockMap::const_iterator
              it = _blockCols[i].begin();
@@ -506,17 +507,16 @@ bool SparseBlockMatrix<MatrixType>::symmPermutation(
         *b = s->transpose();
       }
     }
-    // cerr << endl;
     //  within each row,
   }
   return true;
 }
 
 template <class MatrixType>
-int SparseBlockMatrix<MatrixType>::fillCCS(number_t* Cx,
+int SparseBlockMatrix<MatrixType>::fillCCS(double* Cx,
                                            bool upperTriangle) const {
   assert(Cx && "Target destination is NULL");
-  number_t* CxStart = Cx;
+  double* CxStart = Cx;
   for (size_t i = 0; i < _blockCols.size(); ++i) {
     int cstart = i ? _colBlockIndices[i - 1] : 0;
     int csize = colsOfBlock(i);
@@ -530,7 +530,7 @@ int SparseBlockMatrix<MatrixType>::fillCCS(number_t* Cx,
 
         int elemsToCopy = b->rows();
         if (upperTriangle && rstart == cstart) elemsToCopy = c + 1;
-        memcpy(Cx, b->data() + c * b->rows(), elemsToCopy * sizeof(number_t));
+        memcpy(Cx, b->data() + c * b->rows(), elemsToCopy * sizeof(double));
         Cx += elemsToCopy;
       }
     }
@@ -539,7 +539,7 @@ int SparseBlockMatrix<MatrixType>::fillCCS(number_t* Cx,
 }
 
 template <class MatrixType>
-int SparseBlockMatrix<MatrixType>::fillCCS(int* Cp, int* Ci, number_t* Cx,
+int SparseBlockMatrix<MatrixType>::fillCCS(int* Cp, int* Ci, double* Cx,
                                            bool upperTriangle) const {
   assert(Cp && Ci && Cx && "Target destination is NULL");
   int nz = 0;
@@ -601,7 +601,7 @@ bool SparseBlockMatrix<MatrixType>::writeOctave(const char* filename,
                                                 bool upperTriangle) const {
   std::string name = filename;
   std::string::size_type lastDot = name.find_last_of('.');
-  if (lastDot != std::string::npos) name = name.substr(0, lastDot);
+  if (lastDot != std::string::npos) name.resize(lastDot);
 
   std::vector<TripletEntry> entries;
   for (size_t i = 0; i < _blockCols.size(); ++i) {
@@ -700,8 +700,9 @@ void SparseBlockMatrix<MatrixType>::takePatternFromHash(
     for (typename HashSparseColumn::const_iterator it = column.begin();
          it != column.end(); ++it)
       sparseRowSorted.push_back(*it);
-    std::sort(sparseRowSorted.begin(), sparseRowSorted.end(),
-              CmpPairFirst<int, MatrixType*>());
+    std::sort(
+        sparseRowSorted.begin(), sparseRowSorted.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
     // try to free some memory early
     HashSparseColumn aux;
     std::swap(aux, column);

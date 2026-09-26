@@ -34,6 +34,7 @@
 #include "g2o/core/optimization_algorithm_factory.h"
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/stuff/command_args.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/sampler.h"
 
 using namespace std;
@@ -60,15 +61,13 @@ class VertexCircle : public g2o::BaseVertex<3, Eigen::Vector3d> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   VertexCircle() {}
 
-  virtual bool read(std::istream& /*is*/) { return false; }
+  bool read(std::istream& /*is*/) override { return false; }
 
-  virtual bool write(std::ostream& /*os*/) const { return false; }
+  bool write(std::ostream& /*os*/) const override { return false; }
 
-  virtual void setToOriginImpl() {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
-  }
+  void setToOriginImpl() override { G2O_ERROR("not implemented yet"); }
 
-  virtual void oplusImpl(const double* update) {
+  void oplusImpl(const double* update) override {
     Eigen::Vector3d::ConstMapType v(update);
     _estimate += v;
   }
@@ -86,8 +85,8 @@ class EdgePointOnCircle
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   EdgePointOnCircle() {}
-  virtual bool read(std::istream& /*is*/) { return false; }
-  virtual bool write(std::ostream& /*os*/) const { return false; }
+  bool read(std::istream& /*is*/) override { return false; }
+  bool write(std::ostream& /*os*/) const override { return false; }
 
   template <typename T>
   bool operator()(const T* circle, T* error) const {

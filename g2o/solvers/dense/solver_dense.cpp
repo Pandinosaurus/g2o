@@ -30,6 +30,7 @@
 #include "g2o/core/optimization_algorithm_gauss_newton.h"
 #include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/core/solver.h"
+#include "g2o/stuff/logger.h"
 #include "linear_solver_dense.h"
 
 using namespace std;
@@ -38,10 +39,9 @@ namespace g2o {
 namespace {
 template <int p, int l>
 std::unique_ptr<g2o::Solver> AllocateSolver() {
-  std::cerr << "# Using DENSE poseDim " << p << " landMarkDim " << l
-            << std::endl;
-  return g2o::make_unique<BlockSolverPL<p, l>>(
-      g2o::make_unique<
+  G2O_DEBUG("Using DENSE poseDim {} landMarkDim {}", p, l);
+  return std::make_unique<BlockSolverPL<p, l>>(
+      std::make_unique<
           LinearSolverDense<typename BlockSolverPL<p, l>::PoseMatrixType>>());
 }
 }  // namespace
@@ -54,7 +54,7 @@ static OptimizationAlgorithm* createSolver(const std::string& fullSolverName) {
           {"dense3_2", &AllocateSolver<3, 2>},
           {"dense6_3", &AllocateSolver<6, 3>},
           {"dense7_3", &AllocateSolver<7, 3>},
-      };
+  };
 
   string solverName = fullSolverName.substr(3);
   auto solverf = solver_factories.find(solverName);

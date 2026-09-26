@@ -26,6 +26,8 @@
 
 #include "edge_se2_pointxy_calib.h"
 
+#include <cassert>
+
 namespace g2o {
 
 EdgeSE2PointXYCalib::EdgeSE2PointXYCalib()
@@ -45,9 +47,8 @@ void EdgeSE2PointXYCalib::initialEstimate(
 }
 
 bool EdgeSE2PointXYCalib::read(std::istream& is) {
-  internal::readVector(is, _measurement);
-  readInformationMatrix(is);
-  return true;
+  if (!internal::readVector(is, _measurement)) return false;
+  return readInformationMatrix(is);
 }
 
 bool EdgeSE2PointXYCalib::write(std::ostream& os) const {

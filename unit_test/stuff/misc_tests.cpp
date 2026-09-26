@@ -24,11 +24,13 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <Eigen/Core>
+
 #include "g2o/stuff/misc.h"
 #include "gtest/gtest.h"
 
 namespace {
-number_t simple_normalize_theta(number_t th) {
+double simple_normalize_theta(double th) {
   while (th >= g2o::const_pi()) th -= 2. * g2o::const_pi();
   while (th < -g2o::const_pi()) th += 2. * g2o::const_pi();
   return th;
@@ -99,36 +101,14 @@ TEST(Stuff, Rad2Deg) {
 
 TEST(Stuff, ArrayHasNaN) {
   constexpr int size = 10;
-  number_t data[size];
+  double data[size];
   std::fill_n(data, size, 0);
 
-  auto aux = [](const number_t* data, int size) {
-    int nanIndex = -1;
-    bool hasNan = g2o::arrayHasNaN(data, size, &nanIndex);
-    return std::make_pair(hasNan, nanIndex);
-  };
-
-  EXPECT_EQ(std::make_pair(false, -1), aux(data, size));
+  EXPECT_FALSE(Eigen::VectorXd::MapType(data, size).array().isNaN().any());
 
   for (int i = 0; i < size; ++i) {
     std::fill_n(data, size, 0);
-    data[i] = std::numeric_limits<number_t>::quiet_NaN();
-    EXPECT_EQ(std::make_pair(true, i), aux(data, size));
+    data[i] = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_TRUE(Eigen::VectorXd::MapType(data, size).array().isNaN().any());
   }
-}
-
-TEST(Stuff, Square) {
-  EXPECT_DOUBLE_EQ(4, g2o::square(2));
-  EXPECT_DOUBLE_EQ(4, g2o::square(-2));
-}
-
-TEST(Stuff, Hypot) {
-  EXPECT_DOUBLE_EQ(hypot(2, 0), 2);
-  EXPECT_DOUBLE_EQ(hypot(-2, 0), 2);
-  EXPECT_DOUBLE_EQ(hypot(0, 2), 2);
-  EXPECT_DOUBLE_EQ(hypot(0, -2), 2);
-  EXPECT_DOUBLE_EQ(hypot(3, 3), sqrt(18));
-  EXPECT_DOUBLE_EQ(hypot(-3, 3), sqrt(18));
-  EXPECT_DOUBLE_EQ(hypot(-3, 3), sqrt(18));
-  EXPECT_DOUBLE_EQ(hypot(3, -3), sqrt(18));
 }

@@ -34,11 +34,11 @@ namespace g2o {
 G2O_USE_TYPE_GROUP(sba);
 G2O_REGISTER_TYPE_GROUP(sim3);
 
-G2O_REGISTER_TYPE(VERTEX_SIM3 : EXPMAP, VertexSim3Expmap);
-G2O_REGISTER_TYPE(EDGE_SIM3 : EXPMAP, EdgeSim3);
-G2O_REGISTER_TYPE(EDGE_PROJECT_SIM3_XYZ : EXPMAP, EdgeSim3ProjectXYZ);
-G2O_REGISTER_TYPE(EDGE_PROJECT_INVERSE_SIM3_XYZ
-                  : EXPMAP, EdgeInverseSim3ProjectXYZ);
+G2O_REGISTER_TYPE_NAME("VERTEX_SIM3:EXPMAP", VertexSim3Expmap);
+G2O_REGISTER_TYPE_NAME("EDGE_SIM3:EXPMAP", EdgeSim3);
+G2O_REGISTER_TYPE_NAME("EDGE_PROJECT_SIM3_XYZ:EXPMAP", EdgeSim3ProjectXYZ);
+G2O_REGISTER_TYPE_NAME("EDGE_PROJECT_INVERSE_SIM3_XYZ:EXPMAP",
+                       EdgeInverseSim3ProjectXYZ);
 
 VertexSim3Expmap::VertexSim3Expmap() : BaseVertex<7, Sim3>() {
   _marginalized = false;
@@ -58,47 +58,55 @@ VertexSim3Expmap::VertexSim3Expmap() : BaseVertex<7, Sim3>() {
 EdgeSim3::EdgeSim3()
     : BaseBinaryEdge<7, Sim3, VertexSim3Expmap, VertexSim3Expmap>() {}
 
-bool VertexSim3Expmap::read(std::istream &is) {
+bool VertexSim3Expmap::read(std::istream& is) {
   Vector7 cam2world;
-  bool state = true;
-  state &= internal::readVector(is, cam2world);
-  state &= internal::readVector(is, _focal_length1);
-  state &= internal::readVector(is, _principle_point1);
+  if (!internal::readVector(is, cam2world)) return false;
+  if (!internal::readVector(is, _focal_length1)) return false;
+  if (!internal::readVector(is, _principle_point1)) return false;
   setEstimate(Sim3(cam2world).inverse());
-  return state;
+
+  // Optional trailing fields added later: focal_length2, principle_point2
+  // and the fix_scale flag. Records written before they existed end here
+  // and keep the values they were constructed with.
+  return internal::readOptional(is, _focal_length2[0], _focal_length2[1],
+                                _principle_point2[0], _principle_point2[1],
+                                _fix_scale);
 }
 
-bool VertexSim3Expmap::write(std::ostream &os) const {
+bool VertexSim3Expmap::write(std::ostream& os) const {
   Sim3 cam2world(estimate().inverse());
   Vector7 lv = cam2world.log();
-  internal::writeVector(os, lv);
-  internal::writeVector(os, _focal_length1);
-  internal::writeVector(os, _principle_point1);
-  return os.good();
+  if (!internal::writeVector(os, lv)) return false;
+  if (!internal::writeVector(os, _focal_length1)) return false;
+  if (!internal::writeVector(os, _principle_point1)) return false;
+  if (!internal::writeVector(os, _focal_length2)) return false;
+  if (!internal::writeVector(os, _principle_point2)) return false;
+  os << _fix_scale << " ";
+  return !os.fail();
 }
 
-bool EdgeSim3::read(std::istream &is) {
+bool EdgeSim3::read(std::istream& is) {
   Vector7 v7;
-  internal::readVector(is, v7);
+  if (!internal::readVector(is, v7)) return false;
   Sim3 cam2world(v7);
   setMeasurement(cam2world.inverse());
   return readInformationMatrix(is);
 }
 
-bool EdgeSim3::write(std::ostream &os) const {
+bool EdgeSim3::write(std::ostream& os) const {
   Sim3 cam2world(measurement().inverse());
-  internal::writeVector(os, cam2world.log());
+  if (!internal::writeVector(os, cam2world.log())) return false;
   return writeInformationMatrix(os);
 }
 
 #if G2O_SIM3_JACOBIAN
 void EdgeSim3::linearizeOplus() {
-  VertexSim3Expmap *v1 = static_cast<VertexSim3Expmap *>(_vertices[0]);
-  VertexSim3Expmap *v2 = static_cast<VertexSim3Expmap *>(_vertices[1]);
+  VertexSim3Expmap* v1 = static_cast<VertexSim3Expmap*>(_vertices[0]);
+  VertexSim3Expmap* v2 = static_cast<VertexSim3Expmap*>(_vertices[1]);
   const Sim3 Si(v1->estimate());  // Siw
   const Sim3 Sj(v2->estimate());
 
-  const Sim3 &Sji = _measurement;
+  const Sim3& Sji = _measurement;
 
   // error in Lie Algebra
   const Eigen::Matrix<double, 7, 1> error = (Sji * Si * Sj.inverse()).log();
@@ -146,26 +154,26 @@ void EdgeSim3::linearizeOplus() {
 EdgeSim3ProjectXYZ::EdgeSim3ProjectXYZ()
     : BaseBinaryEdge<2, Vector2, VertexPointXYZ, VertexSim3Expmap>() {}
 
-bool EdgeSim3ProjectXYZ::read(std::istream &is) {
-  internal::readVector(is, _measurement);
+bool EdgeSim3ProjectXYZ::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
   return readInformationMatrix(is);
 }
 
-bool EdgeSim3ProjectXYZ::write(std::ostream &os) const {
-  internal::writeVector(os, _measurement);
+bool EdgeSim3ProjectXYZ::write(std::ostream& os) const {
+  if (!internal::writeVector(os, _measurement)) return false;
   return writeInformationMatrix(os);
 }
 
 EdgeInverseSim3ProjectXYZ::EdgeInverseSim3ProjectXYZ()
     : BaseBinaryEdge<2, Vector2, VertexPointXYZ, VertexSim3Expmap>() {}
 
-bool EdgeInverseSim3ProjectXYZ::read(std::istream &is) {
-  internal::readVector(is, _measurement);
+bool EdgeInverseSim3ProjectXYZ::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
   return readInformationMatrix(is);
 }
 
-bool EdgeInverseSim3ProjectXYZ::write(std::ostream &os) const {
-  internal::writeVector(os, _measurement);
+bool EdgeInverseSim3ProjectXYZ::write(std::ostream& os) const {
+  if (!internal::writeVector(os, _measurement)) return false;
   return writeInformationMatrix(os);
 }
 
@@ -178,12 +186,12 @@ bool EdgeInverseSim3ProjectXYZ::write(std::ostream &os) const {
 //    Vector3 xyz = vi->estimate();
 //    Vector3 xyz_trans = T.map(xyz);
 
-//    number_t x = xyz_trans[0];
-//    number_t y = xyz_trans[1];
-//    number_t z = xyz_trans[2];
-//    number_t z_2 = z*z;
+//    double x = xyz_trans[0];
+//    double y = xyz_trans[1];
+//    double z = xyz_trans[2];
+//    double z_2 = z*z;
 
-//    Matrix<number_t,2,3,Eigen::ColMajor> tmp;
+//    Matrix<double,2,3,Eigen::ColMajor> tmp;
 //    tmp(0,0) = _focal_length(0);
 //    tmp(0,1) = 0;
 //    tmp(0,2) = -x/z*_focal_length(0);

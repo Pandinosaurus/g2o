@@ -87,19 +87,19 @@ class G2O_CORE_API Solver {
    * true, then the solver should store a backup of the diagonal, which can be
    * restored by restoreDiagonal()
    */
-  virtual bool setLambda(number_t lambda, bool backup = false) = 0;
+  virtual bool setLambda(double lambda, bool backup = false) = 0;
 
   /**
-   * restore a previosly made backup of the diagonal
+   * restore a previously made backup of the diagonal
    */
   virtual void restoreDiagonal() = 0;
 
   //! return x, the solution vector
-  number_t* x() { return _x; }
-  const number_t* x() const { return _x; }
+  double* x() { return _x; }
+  const double* x() const { return _x; }
   //! return b, the right hand side of the system
-  number_t* b() { return _b; }
-  const number_t* b() const { return _b; }
+  double* b() { return _b; }
+  const double* b() const { return _b; }
 
   //! return the size of the solution vector (x) and b
   size_t vectorSize() const { return _xSize; }
@@ -114,7 +114,7 @@ class G2O_CORE_API Solver {
 
   /**
    * does this solver support the Schur complement for solving a system
-   * consisting of poses and landmarks. Re-implemement in a derived solver, if
+   * consisting of poses and landmarks. Re-implement in a derived solver, if
    * your solver supports it.
    */
   virtual bool supportsSchur() { return false; }
@@ -137,8 +137,8 @@ class G2O_CORE_API Solver {
 
  protected:
   SparseOptimizer* _optimizer;
-  number_t* _x;
-  number_t* _b;
+  double* _x;
+  double* _b;
   size_t _xSize, _maxXSize;
   bool _isLevenberg;  ///< the system we gonna solve is a Levenberg-Marquardt
                       ///< system

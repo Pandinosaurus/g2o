@@ -36,15 +36,13 @@ using namespace Eigen;
 namespace g2o {
 
 G2O_REGISTER_TYPE_GROUP(icp);
-G2O_REGISTER_TYPE(EDGE_V_V_GICP, Edge_V_V_GICP);
+G2O_REGISTER_TYPE_NAME("EDGE_V_V_GICP", Edge_V_V_GICP);
 
 namespace types_icp {
 int initialized = 0;
 
 void init() {
   if (types_icp::initialized) return;
-  // cerr << "Calling " << __FILE__ << " " << __PRETTY_FUNCTION__ << endl;
-
   Edge_V_V_GICP::dRidx << 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, -2.0, 0.0;
   Edge_V_V_GICP::dRidy << 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0;
   Edge_V_V_GICP::dRidz << 0.0, 2.0, 0.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -66,17 +64,17 @@ Matrix3 VertexSCam::dRidx;     // differential quat matrices
 Matrix3 VertexSCam::dRidy;     // differential quat matrices
 Matrix3 VertexSCam::dRidz;     // differential quat matrices
 Matrix3 VertexSCam::Kcam;
-number_t VertexSCam::baseline;
+double VertexSCam::baseline;
 
 // global initialization
 G2O_ATTRIBUTE_CONSTRUCTOR(init_icp_types) { types_icp::init(); }
 
 // Copy constructor
-Edge_V_V_GICP::Edge_V_V_GICP(const Edge_V_V_GICP *e)
+Edge_V_V_GICP::Edge_V_V_GICP(const Edge_V_V_GICP* e)
     : BaseBinaryEdge<3, EdgeGICP, VertexSE3, VertexSE3>() {
   // Temporary hack - TODO, sort out const-ness properly
-  _vertices[0] = const_cast<HyperGraph::Vertex *>(e->vertex(0));
-  _vertices[1] = const_cast<HyperGraph::Vertex *>(e->vertex(1));
+  _vertices[0] = const_cast<HyperGraph::Vertex*>(e->vertex(0));
+  _vertices[1] = const_cast<HyperGraph::Vertex*>(e->vertex(1));
 
   _measurement.pos0 = e->measurement().pos0;
   _measurement.pos1 = e->measurement().pos1;
@@ -103,7 +101,7 @@ Edge_V_V_GICP::Edge_V_V_GICP(const Edge_V_V_GICP *e)
 //
 // the measurement variable has type EdgeGICP (see types_icp.h)
 
-bool Edge_V_V_GICP::read(std::istream &is) {
+bool Edge_V_V_GICP::read(std::istream& is) {
   // measured point and normal
   for (int i = 0; i < 3; i++) is >> _measurement.pos0[i];
   for (int i = 0; i < 3; i++) is >> _measurement.normal0[i];
@@ -121,9 +119,9 @@ bool Edge_V_V_GICP::read(std::istream &is) {
 
   // point-plane only
   Matrix3 prec;
-  number_t v = cst(.01);
+  double v = cst(.01);
   prec << v, 0, 0, 0, v, 0, 0, 0, 1;
-  const Matrix3 &R = measurement().R0;  // plane of the point in vp0
+  const Matrix3& R = measurement().R0;  // plane of the point in vp0
   information() = R.transpose() * prec * R;
 
   //    information().setIdentity();
@@ -145,8 +143,8 @@ bool Edge_V_V_GICP::read(std::istream &is) {
 //    df/dx0 = [-I, d[dR0.inv()]/dq0 * T01 * p1]
 //    df/dx1 = [R0, T01 * d[dR1]/dq1 * p1]
 void Edge_V_V_GICP::linearizeOplus() {
-  VertexSE3 *vp0 = static_cast<VertexSE3 *>(_vertices[0]);
-  VertexSE3 *vp1 = static_cast<VertexSE3 *>(_vertices[1]);
+  VertexSE3* vp0 = static_cast<VertexSE3*>(_vertices[0]);
+  VertexSE3* vp1 = static_cast<VertexSE3*>(_vertices[1]);
 
   // topLeftCorner<3,3>() is the rotation matrix
   Matrix3 R0T = vp0->estimate().matrix().topLeftCorner<3, 3>().transpose();
@@ -173,7 +171,7 @@ void Edge_V_V_GICP::linearizeOplus() {
 }
 #endif
 
-bool Edge_V_V_GICP::write(std::ostream &os) const {
+bool Edge_V_V_GICP::write(std::ostream& os) const {
   // first point
   for (int i = 0; i < 3; i++) os << measurement().pos0[i] << " ";
   for (int i = 0; i < 3; i++) os << measurement().normal0[i] << " ";
@@ -198,9 +196,9 @@ Edge_XYZ_VSC::Edge_XYZ_VSC() {}
  * \brief Jacobian for stereo projection
  */
 void Edge_XYZ_VSC::linearizeOplus() {
-  VertexSCam *vc = static_cast<VertexSCam *>(_vertices[1]);
+  VertexSCam* vc = static_cast<VertexSCam*>(_vertices[1]);
 
-  VertexPointXYZ *vp = static_cast<VertexPointXYZ *>(_vertices[0]);
+  VertexPointXYZ* vp = static_cast<VertexPointXYZ*>(_vertices[0]);
   Vector4 pt, trans;
   pt.head<3>() = vp->estimate();
   pt(3) = 1.0;
@@ -208,31 +206,31 @@ void Edge_XYZ_VSC::linearizeOplus() {
   trans(3) = 1.0;
 
   // first get the world point in camera coords
-  Eigen::Matrix<number_t, 3, 1, Eigen::ColMajor> pc = vc->w2n * pt;
+  Eigen::Matrix<double, 3, 1, Eigen::ColMajor> pc = vc->w2n * pt;
 
   // Jacobians wrt camera parameters
   // set d(quat-x) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  number_t px = pc(0);
-  number_t py = pc(1);
-  number_t pz = pc(2);
-  number_t ipz2 = 1.0 / (pz * pz);
-  if (isnan(ipz2)) {
+  double px = pc(0);
+  double py = pc(1);
+  double pz = pc(2);
+  double ipz2 = 1.0 / (pz * pz);
+  if (std::isnan(ipz2)) {
     std::cout << "[SetJac] infinite jac" << std::endl;
-    *(int *)0x0 = 0;
+    *(int*)0x0 = 0;
   }
 
-  number_t ipz2fx = ipz2 * vc->Kcam(0, 0);  // Fx
-  number_t ipz2fy = ipz2 * vc->Kcam(1, 1);  // Fy
-  number_t b = vc->baseline;                // stereo baseline
+  double ipz2fx = ipz2 * vc->Kcam(0, 0);  // Fx
+  double ipz2fy = ipz2 * vc->Kcam(1, 1);  // Fy
+  double b = vc->baseline;                // stereo baseline
 
-  Eigen::Matrix<number_t, 3, 1, Eigen::ColMajor> pwt;
+  Eigen::Matrix<double, 3, 1, Eigen::ColMajor> pwt;
 
   // check for local vars
   pwt = (pt - trans)
             .head<3>();  // transform translations, use differential rotation
 
   // dx
-  Eigen::Matrix<number_t, 3, 1, Eigen::ColMajor> dp =
+  Eigen::Matrix<double, 3, 1, Eigen::ColMajor> dp =
       vc->dRdx * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 3) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 3) = (pz * dp(1) - py * dp(2)) * ipz2fy;
@@ -287,12 +285,12 @@ void Edge_XYZ_VSC::linearizeOplus() {
       (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
 }
 #endif
-bool Edge_XYZ_VSC::read(std::istream &) { return false; }
+bool Edge_XYZ_VSC::read(std::istream&) { return false; }
 
-bool Edge_XYZ_VSC::write(std::ostream &) const { return false; }
+bool Edge_XYZ_VSC::write(std::ostream&) const { return false; }
 
-bool VertexSCam::read(std::istream &) { return false; }
+bool VertexSCam::read(std::istream&) { return false; }
 
-bool VertexSCam::write(std::ostream &) const { return false; }
+bool VertexSCam::write(std::ostream&) const { return false; }
 
 }  // namespace g2o

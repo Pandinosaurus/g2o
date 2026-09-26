@@ -44,7 +44,6 @@ class LinearSolverPCG : public LinearSolver<MatrixType> {
  public:
   LinearSolverPCG() : LinearSolver<MatrixType>() {
     _tolerance = cst(1e-6);
-    _verbose = false;
     _absoluteTolerance = true;
     _residual = -1.0;
     _maxIter = -1;
@@ -59,11 +58,11 @@ class LinearSolverPCG : public LinearSolver<MatrixType> {
     return true;
   }
 
-  bool solve(const SparseBlockMatrix<MatrixType>& A, number_t* x, number_t* b);
+  bool solve(const SparseBlockMatrix<MatrixType>& A, double* x, double* b);
 
   //! return the tolerance for terminating PCG before convergence
-  number_t tolerance() const { return _tolerance; }
-  void setTolerance(number_t tolerance) { _tolerance = tolerance; }
+  double tolerance() const { return _tolerance; }
+  void setTolerance(double tolerance) { _tolerance = tolerance; }
 
   int maxIterations() const { return _maxIter; }
   void setMaxIterations(int maxIter) { _maxIter = maxIter; }
@@ -73,18 +72,13 @@ class LinearSolverPCG : public LinearSolver<MatrixType> {
     _absoluteTolerance = absoluteTolerance;
   }
 
-  bool verbose() const { return _verbose; }
-  void setVerbose(bool verbose) { _verbose = verbose; }
-
  protected:
-  typedef std::vector<MatrixType, Eigen::aligned_allocator<MatrixType> >
-      MatrixVector;
-  typedef std::vector<const MatrixType*> MatrixPtrVector;
+  using MatrixVector = std::vector<MatrixType>;
+  using MatrixPtrVector = std::vector<const MatrixType*>;
 
-  number_t _tolerance;
-  number_t _residual;
+  double _tolerance;
+  double _residual;
   bool _absoluteTolerance;
-  bool _verbose;
   int _maxIter;
 
   MatrixPtrVector _diag;

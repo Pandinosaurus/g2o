@@ -52,8 +52,8 @@ void evaluateJacobianUnary(EdgeType& e, JacobianWorkspace& jacobianWorkspace,
                   typename EdgeType::VertexXiType>::linearizeOplus();
 
   // compare the Jacobians
-  number_t* n = numericJacobianWorkspace.workspaceForVertex(0);
-  number_t* a = jacobianWorkspace.workspaceForVertex(0);
+  double* n = numericJacobianWorkspace.workspaceForVertex(0);
+  double* a = jacobianWorkspace.workspaceForVertex(0);
   int numElems = EdgeType::Dimension;
   numElems *= EdgeType::VertexXiType::Dimension;
   for (int j = 0; j < numElems; ++j) {
@@ -63,7 +63,8 @@ void evaluateJacobianUnary(EdgeType& e, JacobianWorkspace& jacobianWorkspace,
 
 template <typename EdgeType>
 void evaluateJacobian(EdgeType& e, JacobianWorkspace& jacobianWorkspace,
-                      JacobianWorkspace& numericJacobianWorkspace) {
+                      JacobianWorkspace& numericJacobianWorkspace,
+                      double tolerance = 1e-6) {
   // calling the analytic Jacobian but writing to the numeric workspace
   e.BaseBinaryEdge<EdgeType::Dimension, typename EdgeType::Measurement,
                    typename EdgeType::VertexXiType,
@@ -80,15 +81,15 @@ void evaluateJacobian(EdgeType& e, JacobianWorkspace& jacobianWorkspace,
 
   // compare the two Jacobians
   for (int i = 0; i < 2; ++i) {
-    number_t* n = numericJacobianWorkspace.workspaceForVertex(i);
-    number_t* a = jacobianWorkspace.workspaceForVertex(i);
+    double* n = numericJacobianWorkspace.workspaceForVertex(i);
+    double* a = jacobianWorkspace.workspaceForVertex(i);
     int numElems = EdgeType::Dimension;
     if (i == 0)
       numElems *= EdgeType::VertexXiType::Dimension;
     else
       numElems *= EdgeType::VertexXjType::Dimension;
     for (int j = 0; j < numElems; ++j) {
-      EXPECT_NEAR(n[j], a[j], 1e-6);
+      EXPECT_NEAR(n[j], a[j], tolerance);
     }
   }
 }

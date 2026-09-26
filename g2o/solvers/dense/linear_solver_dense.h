@@ -30,6 +30,7 @@
 
 #include <Eigen/Cholesky>
 #include <Eigen/Core>
+#include <cassert>
 #include <utility>
 #include <vector>
 
@@ -53,7 +54,7 @@ class LinearSolverDense : public LinearSolver<MatrixType> {
     return true;
   }
 
-  bool solve(const SparseBlockMatrix<MatrixType>& A, number_t* x, number_t* b) {
+  bool solve(const SparseBlockMatrix<MatrixType>& A, double* x, double* b) {
     int n = A.cols();
     int m = A.cols();
 

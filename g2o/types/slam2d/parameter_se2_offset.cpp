@@ -57,7 +57,7 @@ bool ParameterSE2Offset::write(std::ostream& os) const {
 
 CacheSE2Offset::CacheSE2Offset() : Cache(), _offsetParam(0) {}
 
-bool CacheSE2Offset::resolveDependancies() {
+bool CacheSE2Offset::resolveDependencies() {
   _offsetParam = dynamic_cast<ParameterSE2Offset*>(_parameters[0]);
   return _offsetParam != 0;
 }
@@ -77,8 +77,8 @@ void CacheSE2Offset::updateImpl() {
   _w2l = w2l.rotation().toRotationMatrix();
   _w2l.translation() = w2l.translation();
 
-  number_t alpha = v->estimate().rotation().angle();
-  number_t c = std::cos(alpha), s = std::sin(alpha);
+  double alpha = v->estimate().rotation().angle();
+  double c = std::cos(alpha), s = std::sin(alpha);
   Matrix2 RInversePrime;
   RInversePrime << -s, c, -c, -s;
   _RpInverse_RInversePrime =

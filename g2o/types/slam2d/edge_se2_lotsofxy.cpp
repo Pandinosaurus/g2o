@@ -26,6 +26,8 @@
 
 #include "edge_se2_lotsofxy.h"
 
+#include <cassert>
+
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_primitives.h"
 #include "g2o/stuff/opengl_wrapper.h"
@@ -53,6 +55,7 @@ void EdgeSE2LotsOfXY::computeError() {
 
 bool EdgeSE2LotsOfXY::read(std::istream& is) {
   is >> _observedPoints;
+  if (is.fail()) return false;
   setSize(_observedPoints + 1);
 
   // read the measurements
@@ -60,15 +63,18 @@ bool EdgeSE2LotsOfXY::read(std::istream& is) {
     unsigned int index = 2 * i;
     is >> _measurement[index] >> _measurement[index + 1];
   }
+  if (is.fail()) return false;
 
-  // read the information matrix
+  // read the upper triangle of the information matrix
   for (unsigned int i = 0; i < _observedPoints * 2; i++) {
-    // fill the "upper triangle" part of the matrix
     for (unsigned int j = i; j < _observedPoints * 2; j++) {
       is >> information()(i, j);
     }
+  }
+  if (is.fail()) return false;
 
-    // fill the lower triangle part
+  // mirror to fill the lower triangle
+  for (unsigned int i = 0; i < _observedPoints * 2; i++) {
     for (unsigned int j = 0; j < i; j++) {
       information()(i, j) = information()(j, i);
     }
@@ -94,17 +100,17 @@ bool EdgeSE2LotsOfXY::write(std::ostream& os) const {
     }
   }
 
-  return os.good();
+  return !os.fail();
 }
 
 void EdgeSE2LotsOfXY::linearizeOplus() {
   const VertexSE2* vi = static_cast<const VertexSE2*>(_vertices[0]);
-  const number_t& x1 = vi->estimate().translation()[0];
-  const number_t& y1 = vi->estimate().translation()[1];
-  const number_t& th1 = vi->estimate().rotation().angle();
+  const double& x1 = vi->estimate().translation()[0];
+  const double& y1 = vi->estimate().translation()[1];
+  const double& th1 = vi->estimate().rotation().angle();
 
-  number_t ct = std::cos(th1);
-  number_t st = std::sin(th1);
+  double ct = std::cos(th1);
+  double st = std::sin(th1);
 
   MatrixX Ji;
   unsigned int rows = 2 * (_vertices.size() - 1);
@@ -119,8 +125,8 @@ void EdgeSE2LotsOfXY::linearizeOplus() {
   for (unsigned int i = 1; i < _vertices.size(); i++) {
     g2o::VertexPointXY* point = (g2o::VertexPointXY*)(_vertices[i]);
 
-    const number_t& x2 = point->estimate()[0];
-    const number_t& y2 = point->estimate()[1];
+    const double& x2 = point->estimate()[0];
+    const double& y2 = point->estimate()[1];
 
     unsigned int index = 2 * (i - 1);
 
@@ -148,15 +154,7 @@ void EdgeSE2LotsOfXY::initialEstimate(const OptimizableGraph::VertexSet& fixed,
 
   VertexSE2* pose = static_cast<VertexSE2*>(_vertices[0]);
 
-#ifdef _MSC_VER
   std::vector<bool> estimate_this(_observedPoints, true);
-#else
-  bool estimate_this[_observedPoints];
-  for (unsigned int i = 0; i < _observedPoints; i++) {
-    estimate_this[i] = true;
-  }
-#endif
-
   for (std::set<HyperGraph::Vertex*>::iterator it = fixed.begin();
        it != fixed.end(); ++it) {
     for (unsigned int i = 1; i < _vertices.size(); i++) {
@@ -175,7 +173,7 @@ void EdgeSE2LotsOfXY::initialEstimate(const OptimizableGraph::VertexSet& fixed,
   }
 }
 
-number_t EdgeSE2LotsOfXY::initialEstimatePossible(
+double EdgeSE2LotsOfXY::initialEstimatePossible(
     const OptimizableGraph::VertexSet& fixed,
     OptimizableGraph::Vertex* toEstimate) {
   (void)toEstimate;

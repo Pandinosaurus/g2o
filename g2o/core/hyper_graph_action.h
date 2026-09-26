@@ -38,7 +38,7 @@
 #include "hyper_graph.h"
 
 // define to get verbose output
-//#define G2O_DEBUG_ACTIONLIB
+// #define G2O_DEBUG_ACTIONLIB
 
 namespace g2o {
 
@@ -178,10 +178,10 @@ class G2O_CORE_API HyperGraphActionLibrary {
 /**
  * apply an action to all the elements of the graph.
  */
-void G2O_CORE_API
-applyAction(HyperGraph* graph, HyperGraphElementAction* action,
-            HyperGraphElementAction::Parameters* parameters = 0,
-            const std::string& typeName = "");
+void G2O_CORE_API applyAction(
+    HyperGraph* graph, HyperGraphElementAction* action,
+    HyperGraphElementAction::Parameters* parameters = 0,
+    const std::string& typeName = "");
 
 /**
  * brief write into gnuplot
@@ -217,7 +217,6 @@ class G2O_CORE_API DrawAction : public HyperGraphElementAction {
                     HyperGraphElementAction::Parameters* params_);
   Parameters* _previousParams;
   BoolProperty* _show;
-  BoolProperty* _showId;
   HyperGraphElementAction* _cacheDrawActions;
 };
 

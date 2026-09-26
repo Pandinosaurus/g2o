@@ -37,11 +37,10 @@ EdgeSE2::EdgeSE2() : BaseBinaryEdge<3, SE2, VertexSE2, VertexSE2>() {}
 
 bool EdgeSE2::read(std::istream& is) {
   Vector3 p;
-  internal::readVector(is, p);
+  if (!internal::readVector(is, p)) return false;
   setMeasurement(SE2(p));
   _inverseMeasurement = measurement().inverse();
-  readInformationMatrix(is);
-  return is.good() || is.eof();
+  return readInformationMatrix(is);
 }
 
 bool EdgeSE2::write(std::ostream& os) const {
@@ -63,10 +62,10 @@ void EdgeSE2::initialEstimate(const OptimizableGraph::VertexSet& from,
 void EdgeSE2::linearizeOplus() {
   const VertexSE2* vi = static_cast<const VertexSE2*>(_vertices[0]);
   const VertexSE2* vj = static_cast<const VertexSE2*>(_vertices[1]);
-  number_t thetai = vi->estimate().rotation().angle();
+  double thetai = vi->estimate().rotation().angle();
 
   Vector2 dt = vj->estimate().translation() - vi->estimate().translation();
-  number_t si = std::sin(thetai), ci = std::cos(thetai);
+  double si = std::sin(thetai), ci = std::cos(thetai);
 
   _jacobianOplusXi << -ci, -si, -si * dt.x() + ci * dt.y(), si, -ci,
       -ci * dt.x() - si * dt.y(), 0, 0, -1;
@@ -93,8 +92,6 @@ HyperGraphElementAction* EdgeSE2WriteGnuplotAction::operator()(
   WriteGnuplotAction::Parameters* params =
       static_cast<WriteGnuplotAction::Parameters*>(params_);
   if (!params->os) {
-    std::cerr << __PRETTY_FUNCTION__ << ": warning, on valid os specified"
-              << std::endl;
     return nullptr;
   }
 

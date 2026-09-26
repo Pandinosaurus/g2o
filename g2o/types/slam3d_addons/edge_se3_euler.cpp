@@ -35,12 +35,12 @@ using namespace Eigen;
 namespace g2o {
 
 /** conversion code from Euler angles */
-static void jac_quat3_euler3(Eigen::Matrix<number_t, 6, 6, Eigen::ColMajor>& J,
+static void jac_quat3_euler3(Eigen::Matrix<double, 6, 6, Eigen::ColMajor>& J,
                              const Isometry3& t) {
   Vector7 t0 = g2o::internal::toVectorQT(t);
 
-  number_t delta = cst(1e-6);
-  number_t idelta = 1 / (2 * delta);
+  double delta = cst(1e-6);
+  double idelta = 1 / (2 * delta);
 
   Vector7 ta;
   Vector7 tb;
@@ -57,16 +57,18 @@ static void jac_quat3_euler3(Eigen::Matrix<number_t, 6, 6, Eigen::ColMajor>& J,
 bool EdgeSE3Euler::read(std::istream& is) {
   Vector6 meas;
   for (int i = 0; i < 6; i++) is >> meas[i];
+  if (is.fail()) return false;
   Isometry3 transf = g2o::internal::fromVectorET(meas);
-  Matrix<number_t, 6, 6, Eigen::ColMajor> infMatEuler;
+  Matrix<double, 6, 6, Eigen::ColMajor> infMatEuler;
   for (int i = 0; i < 6; i++)
     for (int j = i; j < 6; j++) {
       is >> infMatEuler(i, j);
       if (i != j) infMatEuler(j, i) = infMatEuler(i, j);
     }
-  Matrix<number_t, 6, 6, Eigen::ColMajor> J;
+  if (is.fail()) return false;
+  Matrix<double, 6, 6, Eigen::ColMajor> J;
   jac_quat3_euler3(J, transf);
-  Matrix<number_t, 6, 6, Eigen::ColMajor> infMat =
+  Matrix<double, 6, 6, Eigen::ColMajor> infMat =
       J.transpose() * infMatEuler * J;
   setMeasurement(transf);
   setInformation(infMat);
@@ -77,17 +79,17 @@ bool EdgeSE3Euler::write(std::ostream& os) const {
   Vector6 meas = g2o::internal::toVectorET(_measurement);
   for (int i = 0; i < 6; i++) os << meas[i] << " ";
 
-  Matrix<number_t, 6, 6, Eigen::ColMajor> J;
+  Matrix<double, 6, 6, Eigen::ColMajor> J;
   jac_quat3_euler3(J, measurement());
   // HACK: invert the jacobian to simulate the inverse derivative
   J = J.inverse();
-  Matrix<number_t, 6, 6, Eigen::ColMajor> infMatEuler =
+  Matrix<double, 6, 6, Eigen::ColMajor> infMatEuler =
       J.transpose() * information() * J;
   for (int i = 0; i < 6; i++)
     for (int j = i; j < 6; j++) {
       os << " " << infMatEuler(i, j);
     }
-  return os.good();
+  return !os.fail();
 }
 
 }  // namespace g2o

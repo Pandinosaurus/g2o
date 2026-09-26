@@ -26,14 +26,11 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <cassert>
 #include <iostream>
+#include <string_view>
 
-#ifdef G2O_USE_VENDORED_CERES
-#include "g2o/EXTERNAL/ceres/autodiff.h"
-#else
-#include <ceres/internal/autodiff.h>
-#endif
-
+#include "g2o/autodiff/autodiff.h"
 #include "g2o/core/auto_differentiation.h"
 #include "g2o/core/base_binary_edge.h"
 #include "g2o/core/base_vertex.h"
@@ -44,6 +41,7 @@
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/solvers/pcg/linear_solver_pcg.h"
 #include "g2o/stuff/command_args.h"
+#include "g2o/stuff/logger.h"
 
 #if defined G2O_HAVE_CHOLMOD
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
@@ -74,21 +72,19 @@ class VertexCameraBAL : public g2o::BaseVertex<9, g2o::bal::Vector9> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   VertexCameraBAL() {}
 
-  virtual bool read(std::istream& /*is*/) {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool read(std::istream& /*is*/) override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
 
-  virtual bool write(std::ostream& /*os*/) const {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool write(std::ostream& /*os*/) const override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
 
-  virtual void setToOriginImpl() {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
-  }
+  void setToOriginImpl() override { G2O_ERROR("not implemented yet"); }
 
-  virtual void oplusImpl(const double* update) {
+  void oplusImpl(const double* update) override {
     g2o::bal::Vector9::ConstMapType v(update, VertexCameraBAL::Dimension);
     _estimate += v;
   }
@@ -104,21 +100,19 @@ class VertexPointBAL : public g2o::BaseVertex<3, g2o::Vector3> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   VertexPointBAL() {}
 
-  virtual bool read(std::istream& /*is*/) {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool read(std::istream& /*is*/) override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
 
-  virtual bool write(std::ostream& /*os*/) const {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool write(std::ostream& /*os*/) const override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
 
-  virtual void setToOriginImpl() {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
-  }
+  void setToOriginImpl() override { G2O_ERROR("not implemented yet"); }
 
-  virtual void oplusImpl(const double* update) {
+  void oplusImpl(const double* update) override {
     g2o::Vector3::ConstMapType v(update);
     _estimate += v;
   }
@@ -152,12 +146,12 @@ class EdgeObservationBAL
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
   EdgeObservationBAL() {}
-  virtual bool read(std::istream& /*is*/) {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool read(std::istream& /*is*/) override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
-  virtual bool write(std::ostream& /*os*/) const {
-    cerr << __PRETTY_FUNCTION__ << " not implemented yet" << endl;
+  bool write(std::ostream& /*os*/) const override {
+    G2O_ERROR("not implemented yet");
     return false;
   }
 
@@ -230,34 +224,34 @@ int main(int argc, char** argv) {
 
   arg.parseArgs(argc, argv);
 
-  typedef g2o::BlockSolver<g2o::BlockSolverTraits<9, 3>> BalBlockSolver;
-#ifdef G2O_HAVE_CHOLMOD
-  string choleskySolverName = "CHOLMOD";
-  typedef g2o::LinearSolverCholmod<BalBlockSolver::PoseMatrixType>
-      BalLinearSolver;
-#else
-  string choleskySolverName = "Eigen";
-  typedef g2o::LinearSolverEigen<BalBlockSolver::PoseMatrixType>
-      BalLinearSolver;
-#endif
-  typedef g2o::LinearSolverPCG<BalBlockSolver::PoseMatrixType>
-      BalLinearSolverPCG;
+  using BalBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<9, 3>>;
+  using BalLinearSolverPCG =
+      g2o::LinearSolverPCG<BalBlockSolver::PoseMatrixType>;
 
   g2o::SparseOptimizer optimizer;
   std::unique_ptr<g2o::LinearSolver<BalBlockSolver::PoseMatrixType>>
       linearSolver;
   if (usePCG) {
     cout << "Using PCG" << endl;
-    linearSolver = g2o::make_unique<BalLinearSolverPCG>();
+    linearSolver = std::make_unique<BalLinearSolverPCG>();
   } else {
+#ifdef G2O_HAVE_CHOLMOD
+    string_view choleskySolverName = "CHOLMOD";
+    using BalLinearSolver =
+        g2o::LinearSolverCholmod<BalBlockSolver::PoseMatrixType>;
+#else
+    string_view choleskySolverName = "Eigen";
+    using BalLinearSolver =
+        g2o::LinearSolverEigen<BalBlockSolver::PoseMatrixType>;
+#endif
     cout << "Using Cholesky: " << choleskySolverName << endl;
-    auto cholesky = g2o::make_unique<BalLinearSolver>();
+    auto cholesky = std::make_unique<BalLinearSolver>();
     cholesky->setBlockOrdering(true);
     linearSolver = std::move(cholesky);
   }
   g2o::OptimizationAlgorithmLevenberg* solver =
       new g2o::OptimizationAlgorithmLevenberg(
-          g2o::make_unique<BalBlockSolver>(std::move(linearSolver)));
+          std::make_unique<BalBlockSolver>(std::move(linearSolver)));
 
   // solver->setUserLambdaInit(1);
   optimizer.setAlgorithm(solver);

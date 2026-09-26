@@ -25,9 +25,12 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <Eigen/LU>
+#include <cassert>
 #include <fstream>
 #include <iomanip>
 
+#include "g2o/core/eigen_types.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
 #include "g2o/stuff/misc.h"
 #include "g2o/stuff/timeutil.h"
@@ -58,28 +61,28 @@ void BlockSolver<Traits>::resize(int* blockPoseIndices, int numPoseBlocks,
   if (_doSchur) {
     // the following two are only used in schur
     assert(_sizePoses > 0 && "allocating with wrong size");
-    _coefficients.reset(allocate_aligned<number_t>(s));
-    _bschur.reset(allocate_aligned<number_t>(_sizePoses));
+    _coefficients.reset(allocate_aligned<double>(s));
+    _bschur.reset(allocate_aligned<double>(_sizePoses));
   }
 
-  _Hpp = g2o::make_unique<PoseHessianType>(blockPoseIndices, blockPoseIndices,
+  _Hpp = std::make_unique<PoseHessianType>(blockPoseIndices, blockPoseIndices,
                                            numPoseBlocks, numPoseBlocks);
   if (_doSchur) {
-    _Hschur = g2o::make_unique<PoseHessianType>(
+    _Hschur = std::make_unique<PoseHessianType>(
         blockPoseIndices, blockPoseIndices, numPoseBlocks, numPoseBlocks);
-    _Hll = g2o::make_unique<LandmarkHessianType>(
+    _Hll = std::make_unique<LandmarkHessianType>(
         blockLandmarkIndices, blockLandmarkIndices, numLandmarkBlocks,
         numLandmarkBlocks);
     _DInvSchur =
-        g2o::make_unique<SparseBlockMatrixDiagonal<LandmarkMatrixType>>(
+        std::make_unique<SparseBlockMatrixDiagonal<LandmarkMatrixType>>(
             _Hll->colBlockIndices());
-    _Hpl = g2o::make_unique<PoseLandmarkHessianType>(
+    _Hpl = std::make_unique<PoseLandmarkHessianType>(
         blockPoseIndices, blockLandmarkIndices, numPoseBlocks,
         numLandmarkBlocks);
-    _HplCCS = g2o::make_unique<SparseBlockMatrixCCS<PoseLandmarkMatrixType>>(
+    _HplCCS = std::make_unique<SparseBlockMatrixCCS<PoseLandmarkMatrixType>>(
         _Hpl->rowBlockIndices(), _Hpl->colBlockIndices());
     _HschurTransposedCCS =
-        g2o::make_unique<SparseBlockMatrixCCS<PoseMatrixType>>(
+        std::make_unique<SparseBlockMatrixCCS<PoseMatrixType>>(
             _Hschur->colBlockIndices(), _Hschur->rowBlockIndices());
 #ifdef G2O_OPENMP
     _coefficientsMutex.resize(numPoseBlocks);
@@ -285,7 +288,7 @@ bool BlockSolver<Traits>::updateStructure(
       PoseMatrixType* m = _Hpp->block(ind, ind, true);
       v->mapHessianMemory(m->data());
     } else {
-      std::cerr << "updateStructure(): Schur not supported" << std::endl;
+      G2O_ERROR("updateStructure(): Schur not supported");
       abort();
     }
   }
@@ -316,7 +319,7 @@ bool BlockSolver<Traits>::updateStructure(
           PoseMatrixType* m = _Hpp->block(ind1, ind2, true);
           e->mapHessianMemory(m->data(), viIdx, vjIdx, transposedBlock);
         } else {
-          std::cerr << __PRETTY_FUNCTION__ << ": not supported" << std::endl;
+          G2O_ERROR("not supported");
         }
       }
     }
@@ -327,9 +330,8 @@ bool BlockSolver<Traits>::updateStructure(
 
 template <typename Traits>
 bool BlockSolver<Traits>::solve() {
-  // cerr << __PRETTY_FUNCTION__ << endl;
   if (!_doSchur) {
-    number_t t = get_monotonic_time();
+    double t = get_monotonic_time();
     bool ok = _linearSolver->solve(*_Hpp, _x, _b);
     G2OBatchStatistics* globalStats = G2OBatchStatistics::globalStats();
     if (globalStats) {
@@ -343,14 +345,14 @@ bool BlockSolver<Traits>::solve() {
   // schur thing
 
   // backup the coefficient matrix
-  number_t t = get_monotonic_time();
+  double t = get_monotonic_time();
 
   // _Hschur = _Hpp, but keeping the pattern of _Hschur
   _Hschur->clear();
   _Hpp->add(*_Hschur);
 
   //_DInvSchur->clear();
-  memset(_coefficients.get(), 0, _sizePoses * sizeof(number_t));
+  memset(_coefficients.get(), 0, _sizePoses * sizeof(double));
 #ifdef G2O_OPENMP
 #pragma omp parallel for default(shared) schedule(dynamic, 10)
 #endif
@@ -423,10 +425,9 @@ bool BlockSolver<Traits>::solve() {
       }
     }
   }
-  // cerr << "Solve [marginalize] = " <<  get_monotonic_time()-t << endl;
 
   // _bschur = _b for calling solver, and not touching _b
-  memcpy(_bschur.get(), _b, _sizePoses * sizeof(number_t));
+  memcpy(_bschur.get(), _b, _sizePoses * sizeof(double));
   for (int i = 0; i < _sizePoses; ++i) {
     _bschur[i] -= _coefficients[i];
   }
@@ -445,35 +446,32 @@ bool BlockSolver<Traits>::solve() {
     globalStats->hessianDimension = globalStats->hessianPoseDimension +
                                     globalStats->hessianLandmarkDimension;
   }
-  // cerr << "Solve [decompose and solve] = " <<  get_monotonic_time()-t <<
-  // endl;
 
   if (!solvedPoses) return false;
 
   // _x contains the solution for the poses, now applying it to the landmarks to
   // get the new part of the solution;
-  number_t* xp = _x;
-  number_t* cp = _coefficients.get();
+  double* xp = _x;
+  double* cp = _coefficients.get();
 
-  number_t* xl = _x + _sizePoses;
-  number_t* cl = _coefficients.get() + _sizePoses;
-  number_t* bl = _b + _sizePoses;
+  double* xl = _x + _sizePoses;
+  double* cl = _coefficients.get() + _sizePoses;
+  double* bl = _b + _sizePoses;
 
   // cp = -xp
   for (int i = 0; i < _sizePoses; ++i) cp[i] = -xp[i];
 
   // cl = bl
-  memcpy(cl, bl, _sizeLandmarks * sizeof(number_t));
+  memcpy(cl, bl, _sizeLandmarks * sizeof(double));
 
   // cl = bl - Bt * xp
   // Bt->multiply(cl, cp);
   _HplCCS->rightMultiply(cl, cp);
 
   // xl = Dinv * cl
-  memset(xl, 0, _sizeLandmarks * sizeof(number_t));
+  memset(xl, 0, _sizeLandmarks * sizeof(double));
   _DInvSchur->multiply(xl, cl);
   //_DInvSchur->rightMultiply(xl,cl);
-  // cerr << "Solve [landmark delta] = " <<  get_monotonic_time()-t << endl;
 
   return true;
 }
@@ -482,7 +480,7 @@ template <typename Traits>
 bool BlockSolver<Traits>::computeMarginals(
     SparseBlockMatrix<MatrixX>& spinv,
     const std::vector<std::pair<int, int>>& blockIndices) {
-  number_t t = get_monotonic_time();
+  double t = get_monotonic_time();
   bool ok = _linearSolver->solvePattern(spinv, blockIndices, *_Hpp);
   G2OBatchStatistics* globalStats = G2OBatchStatistics::globalStats();
   if (globalStats) {
@@ -496,7 +494,7 @@ bool BlockSolver<Traits>::buildSystem() {
   // clear b vector
 #ifdef G2O_OPENMP
 #pragma omp parallel for default( \
-    shared) if (_optimizer->indexMapping().size() > 1000)
+        shared) if (_optimizer->indexMapping().size() > 1000)
 #endif
   for (int i = 0; i < static_cast<int>(_optimizer->indexMapping().size());
        ++i) {
@@ -521,7 +519,7 @@ bool BlockSolver<Traits>::buildSystem() {
   // thread
   JacobianWorkspace jacobianWorkspace = _optimizer->jacobianWorkspace();
 #pragma omp parallel for default(shared) firstprivate( \
-    jacobianWorkspace) if (_optimizer->activeEdges().size() > 100)
+        jacobianWorkspace) if (_optimizer->activeEdges().size() > 100)
 #endif
   for (int k = 0; k < static_cast<int>(_optimizer->activeEdges().size()); ++k) {
     OptimizableGraph::Edge* e = _optimizer->activeEdges()[k];
@@ -533,11 +531,16 @@ bool BlockSolver<Traits>::buildSystem() {
       const OptimizableGraph::Vertex* v =
           static_cast<const OptimizableGraph::Vertex*>(e->vertex(i));
       if (!v->fixed()) {
-        bool hasANan = arrayHasNaN(jacobianWorkspace.workspaceForVertex(i),
-                                   e->dimension() * v->dimension());
+        bool hasANan =
+            g2o::VectorX::MapType(jacobianWorkspace.workspaceForVertex(i),
+                                  e->dimension() * v->dimension())
+                .array()
+                .isNaN()
+                .any();
         if (hasANan) {
-          std::cerr << "buildSystem(): NaN within Jacobian for edge " << e
-                    << " for vertex " << i << std::endl;
+          G2O_WARN(
+              "buildSystem(): NaN within Jacobian for edge {} for vertex {}",
+              static_cast<void*>(e), i);
           break;
         }
       }
@@ -548,7 +551,7 @@ bool BlockSolver<Traits>::buildSystem() {
   // flush the current system in a sparse block matrix
 #ifdef G2O_OPENMP
 #pragma omp parallel for default( \
-    shared) if (_optimizer->indexMapping().size() > 1000)
+        shared) if (_optimizer->indexMapping().size() > 1000)
 #endif
   for (int i = 0; i < static_cast<int>(_optimizer->indexMapping().size());
        ++i) {
@@ -562,7 +565,7 @@ bool BlockSolver<Traits>::buildSystem() {
 }
 
 template <typename Traits>
-bool BlockSolver<Traits>::setLambda(number_t lambda, bool backup) {
+bool BlockSolver<Traits>::setLambda(double lambda, bool backup) {
   if (backup) {
     _diagonalBackupPose.resize(_numPoses);
     _diagonalBackupLandmark.resize(_numLandmarks);

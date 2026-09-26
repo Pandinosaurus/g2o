@@ -27,9 +27,8 @@
 #ifndef G2O_EDGE_LINE2D_H
 #define G2O_EDGE_LINE2D_H
 
-#include "g2o/config.h"
 #include "g2o/core/base_binary_edge.h"
-#include "types_slam2d_addons.h"
+#include "g2o_types_slam2d_addons_api.h"
 #include "vertex_line2d.h"
 
 namespace g2o {
@@ -52,13 +51,13 @@ class G2O_TYPES_SLAM2D_ADDONS_API EdgeLine2D
 
   virtual void setMeasurement(const Vector2& m) { _measurement = m; }
 
-  virtual bool setMeasurementData(const number_t* d) {
+  virtual bool setMeasurementData(const double* d) {
     Eigen::Map<const Vector2> m(d);
     _measurement = Line2D(m);
     return true;
   }
 
-  virtual bool getMeasurementData(number_t* d) const {
+  virtual bool getMeasurementData(double* d) const {
     Eigen::Map<Vector2> m(d);
     m = _measurement;
     return true;
@@ -73,8 +72,8 @@ class G2O_TYPES_SLAM2D_ADDONS_API EdgeLine2D
     return true;
   }
 
-  virtual number_t initialEstimatePossible(const OptimizableGraph::VertexSet&,
-                                           OptimizableGraph::Vertex*) {
+  virtual double initialEstimatePossible(const OptimizableGraph::VertexSet&,
+                                         OptimizableGraph::Vertex*) {
     return 0;
   }
 #ifndef NUMERIC_JACOBIAN_THREE_D_TYPES

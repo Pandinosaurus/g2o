@@ -34,7 +34,7 @@ VertexSE3Expmap::VertexSE3Expmap() : BaseVertex<6, SE3Quat>() {}
 
 bool VertexSE3Expmap::read(std::istream& is) {
   Vector7 est;
-  internal::readVector(is, est);
+  if (!internal::readVector(is, est)) return false;
   setEstimate(SE3Quat(est).inverse());
   return true;
 }
@@ -45,7 +45,7 @@ bool VertexSE3Expmap::write(std::ostream& os) const {
 
 void VertexSE3Expmap::setToOriginImpl() { _estimate = SE3Quat(); }
 
-void VertexSE3Expmap::oplusImpl(const number_t* update_) {
+void VertexSE3Expmap::oplusImpl(const double* update_) {
   Eigen::Map<const Vector6> update(update_);
   setEstimate(SE3Quat::exp(update) * estimate());
 }

@@ -29,6 +29,7 @@
 #include <iostream>
 #include <vector>
 
+#include "logger.h"
 #include "macros.h"
 #include "string_tools.h"
 using namespace std;
@@ -67,14 +68,14 @@ bool PropertyMap::updatePropertyFromString(const std::string& name,
 }
 
 void PropertyMap::writeToCSV(std::ostream& os) const {
-  for (PropertyMapConstIterator it = begin(); it != end(); ++it) {
-    BaseProperty* p = it->second;
-    os << p->name() << ", ";
+  for (auto it = cbegin(); it != cend(); ++it) {
+    if (it != cbegin()) os << ",";
+    os << it->second->name();
   }
   os << std::endl;
-  for (PropertyMapConstIterator it = begin(); it != end(); ++it) {
-    BaseProperty* p = it->second;
-    os << p->toString() << ", ";
+  for (auto it = cbegin(); it != cend(); ++it) {
+    if (it != cbegin()) os << ",";
+    os << it->second->toString();
   }
   os << std::endl;
 }
@@ -85,8 +86,7 @@ bool PropertyMap::updateMapFromString(const std::string& values) {
   for (size_t i = 0; i < valuesMap.size(); ++i) {
     vector<string> m = strSplit(valuesMap[i], "=");
     if (m.size() != 2) {
-      cerr << __PRETTY_FUNCTION__ << ": unable to extract name=value pair from "
-           << valuesMap[i] << endl;
+      G2O_DEBUG("unable to extract name=value pair from {}", valuesMap[i]);
       continue;
     }
     string name = trim(m[0]);

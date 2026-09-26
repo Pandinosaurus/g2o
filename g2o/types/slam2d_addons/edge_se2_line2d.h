@@ -27,7 +27,6 @@
 #ifndef G2O_EDGE_SE2_LINE2D_H
 #define G2O_EDGE_SE2_LINE2D_H
 
-#include "g2o/config.h"
 #include "g2o/core/base_binary_edge.h"
 #include "g2o/stuff/misc.h"
 #include "g2o/types/slam2d/vertex_se2.h"
@@ -55,13 +54,13 @@ class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Line2D
     _error[0] = normalize_theta(_error[0]);
   }
 
-  virtual bool setMeasurementData(const number_t* d) {
+  virtual bool setMeasurementData(const double* d) {
     _measurement[0] = d[0];
     _measurement[1] = d[1];
     return true;
   }
 
-  virtual bool getMeasurementData(number_t* d) const {
+  virtual bool getMeasurementData(double* d) const {
     d[0] = _measurement[0];
     d[1] = _measurement[1];
     return true;
@@ -87,35 +86,12 @@ class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Line2D
 
   virtual void initialEstimate(const OptimizableGraph::VertexSet& from,
                                OptimizableGraph::Vertex* to);
-  virtual number_t initialEstimatePossible(
+  virtual double initialEstimatePossible(
       const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to) {
     (void)to;
     return (from.count(_vertices[0]) == 1 ? 1.0 : -1.0);
   }
-  /* #ifndef NUMERIC_JACOBIAN_TWO_D_TYPES */
-  /*       virtual void linearizeOplus(); */
-  /* #endif */
 };
-
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Line2DWriteGnuplotAction: public
- * WriteGnuplotAction { */
-/*   public: */
-/*     EdgeSE2Line2DWriteGnuplotAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-
-/* #ifdef G2O_HAVE_OPENGL */
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeSE2Line2DDrawAction: public
- * DrawAction{ */
-/*   public: */
-/*     EdgeSE2Line2DDrawAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-/* #endif */
 
 }  // namespace g2o
 

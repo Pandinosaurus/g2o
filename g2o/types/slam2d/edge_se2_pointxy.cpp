@@ -26,6 +26,8 @@
 
 #include "edge_se2_pointxy.h"
 
+#include <cassert>
+
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_primitives.h"
 #include "g2o/stuff/opengl_wrapper.h"
@@ -37,9 +39,8 @@ EdgeSE2PointXY::EdgeSE2PointXY()
     : BaseBinaryEdge<2, Vector2, VertexSE2, VertexPointXY>() {}
 
 bool EdgeSE2PointXY::read(std::istream& is) {
-  internal::readVector(is, _measurement);
-  readInformationMatrix(is);
-  return true;
+  if (!internal::readVector(is, _measurement)) return false;
+  return readInformationMatrix(is);
 }
 
 bool EdgeSE2PointXY::write(std::ostream& os) const {
@@ -63,15 +64,15 @@ void EdgeSE2PointXY::initialEstimate(const OptimizableGraph::VertexSet& from,
 void EdgeSE2PointXY::linearizeOplus() {
   const VertexSE2* vi = static_cast<const VertexSE2*>(_vertices[0]);
   const VertexPointXY* vj = static_cast<const VertexPointXY*>(_vertices[1]);
-  const number_t& x1 = vi->estimate().translation()[0];
-  const number_t& y1 = vi->estimate().translation()[1];
-  const number_t& th1 = vi->estimate().rotation().angle();
-  const number_t& x2 = vj->estimate()[0];
-  const number_t& y2 = vj->estimate()[1];
+  const double& x1 = vi->estimate().translation()[0];
+  const double& y1 = vi->estimate().translation()[1];
+  const double& th1 = vi->estimate().rotation().angle();
+  const double& x2 = vj->estimate()[0];
+  const double& y2 = vj->estimate()[1];
 
-  number_t aux_1 = std::cos(th1);
-  number_t aux_2 = -aux_1;
-  number_t aux_3 = std::sin(th1);
+  double aux_1 = std::cos(th1);
+  double aux_2 = -aux_1;
+  double aux_3 = std::sin(th1);
 
   _jacobianOplusXi(0, 0) = aux_2;
   _jacobianOplusXi(0, 1) = -aux_3;
@@ -97,8 +98,6 @@ HyperGraphElementAction* EdgeSE2PointXYWriteGnuplotAction::operator()(
   WriteGnuplotAction::Parameters* params =
       static_cast<WriteGnuplotAction::Parameters*>(params_);
   if (!params->os) {
-    std::cerr << __PRETTY_FUNCTION__ << ": warning, on valid os specified"
-              << std::endl;
     return nullptr;
   }
 

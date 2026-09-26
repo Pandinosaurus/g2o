@@ -32,13 +32,8 @@
 #include <limits>
 #include <utility>
 
-#ifdef G2O_USE_VENDORED_CERES
-#include "g2o/EXTERNAL/ceres/fixed_array.h"
-#else
-#include <ceres/internal/fixed_array.h>
-#endif
-
 #include "base_edge.h"
+#include "g2o/autodiff/fixed_array.h"
 #include "g2o/config.h"
 #include "g2o/stuff/misc.h"
 #include "g2o/stuff/tuple_tools.h"
@@ -109,20 +104,21 @@ std::tuple<Args...> createHessianMaps(const std::tuple<Args...>&) {
   return std::tuple<Args...>{createHessianMapK<Args>()...};
 }
 
-// clang-format off
-template <std::size_t I, typename... Tp>
-typename std::enable_if<I >= sizeof...(Tp), OptimizableGraph::Vertex*>::type createNthVertexType(size_t) {
-  return nullptr;  // end of recursion, return null
+template <int I, typename EdgeType, typename... CtorArgs>
+typename std::enable_if<I == -1, OptimizableGraph::Vertex*>::type
+createNthVertexType(int /*i*/, const EdgeType& /*t*/, CtorArgs... /*args*/) {
+  return nullptr;
 }
-template <std::size_t I, typename... Tp>
-typename std::enable_if <I < sizeof...(Tp), OptimizableGraph::Vertex*>::type createNthVertexType(size_t i) {
+
+template <int I, typename EdgeType, typename... CtorArgs>
+typename std::enable_if<I != -1, OptimizableGraph::Vertex*>::type
+createNthVertexType(int i, const EdgeType& t, CtorArgs... args) {
   if (i == I) {
-    using VertexType = typename std::tuple_element<I, std::tuple<Tp...>>::type;
-    return new VertexType();
-  } else
-    return createNthVertexType<I + 1, Tp...>(i);
+    using VertexType = typename EdgeType::template VertexXnType<I>;
+    return new VertexType(args...);
+  }
+  return createNthVertexType<I - 1, EdgeType, CtorArgs...>(i, t, args...);
 }
-// clang-format on
 }  // namespace internal
 
 template <int D, typename E, typename... VertexTypes>
@@ -172,15 +168,15 @@ class BaseFixedSizedEdge : public BaseEdge<D, E> {
 
   template <int EdgeDimension, int VertexDimension>
   using JacobianType = typename Eigen::Matrix<
-      number_t, EdgeDimension, VertexDimension,
+      double, EdgeDimension, VertexDimension,
       EdgeDimension == 1 ? Eigen::RowMajor : Eigen::ColMajor>::AlignedMapType;
 
   //! it requires quite some ugly code to get the type of hessians...
   template <int DN, int DM>
   using HessianBlockType = Eigen::Map<
-      Eigen::Matrix<number_t, DN, DM,
+      Eigen::Matrix<double, DN, DM,
                     DN == 1 ? Eigen::RowMajor : Eigen::ColMajor>,
-      Eigen::Matrix<number_t, DN, DM,
+      Eigen::Matrix<double, DN, DM,
                     DN == 1 ? Eigen::RowMajor : Eigen::ColMajor>::Flags &
               Eigen::PacketAccessBit
           ? Eigen::Aligned
@@ -220,10 +216,13 @@ class BaseFixedSizedEdge : public BaseEdge<D, E> {
   }
 
   //! create an instance of the Nth VertexType
-  virtual OptimizableGraph::Vertex* createVertex(int i) {
+  template <typename... CtorArgs>
+  OptimizableGraph::Vertex* createVertex(int i, CtorArgs... args) {
     if (i < 0) return nullptr;
-    return internal::createNthVertexType<0, VertexTypes...>(
-        static_cast<size_t>(i));
+    return internal::createNthVertexType<
+        sizeof...(VertexTypes) - 1,
+        typename std::remove_reference<decltype(*this)>::type, CtorArgs...>(
+        i, *this, args...);
   };
 
   virtual void resize(size_t size);
@@ -287,7 +286,7 @@ class BaseFixedSizedEdge : public BaseEdge<D, E> {
   template <int N, int M, typename AtOType>
   void constructOffDiagonalQuadraticFormM(const AtOType& AtO);
 
-  virtual void mapHessianMemory(number_t* d, int i, int j, bool rowMajor);
+  virtual void mapHessianMemory(double* d, int i, int j, bool rowMajor);
 
   using BaseEdge<D, E>::resize;
   using BaseEdge<D, E>::computeError;

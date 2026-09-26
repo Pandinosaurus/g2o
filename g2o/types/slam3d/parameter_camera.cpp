@@ -49,8 +49,7 @@ void ParameterCamera::setOffset(const Isometry3& offset_) {
   _Kcam_inverseOffsetR = _Kcam * inverseOffset().rotation();
 }
 
-void ParameterCamera::setKcam(number_t fx, number_t fy, number_t cx,
-                              number_t cy) {
+void ParameterCamera::setKcam(double fx, double fy, double cx, double cy) {
   _Kcam.setZero();
   _Kcam(0, 0) = fx;
   _Kcam(1, 1) = fy;
@@ -63,28 +62,27 @@ void ParameterCamera::setKcam(number_t fx, number_t fy, number_t cx,
 
 bool ParameterCamera::read(std::istream& is) {
   Vector7 off;
-  internal::readVector(is, off);
+  if (!internal::readVector(is, off)) return false;
   // normalize the quaternion to recover numerical precision lost by storing as
   // human readable text
   Vector4::MapType(off.data() + 3).normalize();
   setOffset(internal::fromVectorQT(off));
-  number_t fx, fy, cx, cy;
+  double fx, fy, cx, cy;
   is >> fx >> fy >> cx >> cy;
+  if (is.fail()) return false;
   setKcam(fx, fy, cx, cy);
-  return is.good();
+  return true;
 }
 
 bool ParameterCamera::write(std::ostream& os) const {
-  internal::writeVector(os, internal::toVectorQT(_offset));
-  os << _Kcam(0, 0) << " ";
-  os << _Kcam(1, 1) << " ";
-  os << _Kcam(0, 2) << " ";
-  os << _Kcam(1, 2) << " ";
-  return os.good();
+  if (!internal::writeVector(os, internal::toVectorQT(_offset))) return false;
+  os << _Kcam(0, 0) << " " << _Kcam(1, 1) << " " << _Kcam(0, 2) << " "
+     << _Kcam(1, 2) << " ";
+  return !os.fail();
 }
 
-bool CacheCamera::resolveDependancies() {
-  if (!CacheSE3Offset::resolveDependancies()) return false;
+bool CacheCamera::resolveDependencies() {
+  if (!CacheSE3Offset::resolveDependencies()) return false;
   params = dynamic_cast<ParameterCamera*>(_parameters[0]);
   return params != 0;
 }

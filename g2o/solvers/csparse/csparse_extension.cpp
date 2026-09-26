@@ -7,7 +7,7 @@
 // CSparse is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
 // License as published by the Free Software Foundation; either
-// version 1.1 of the License, or (at your option) any later version.
+// version 2.1 of the License, or (at your option) any later version.
 //
 // CSparse is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,33 +21,27 @@
 #include "csparse_extension.h"
 
 #include <cassert>
-#include <iostream>
 
-#include "g2o/stuff/macros.h"
+#include "g2o/stuff/logger.h"
 
-using namespace std;
-
-namespace g2o {
-namespace csparse_extension {
+namespace g2o::csparse_extension {
 
 /**
  * Originally from CSparse, avoid memory re-allocations by giving workspace
  * pointers CSparse: Copyright (c) 2006-2011, Timothy A. Davis.
  */
-int cs_cholsolsymb(const cs *A, number_t *b, const css *S, number_t *x,
-                   int *work) {
-  csn *N;
+int cs_cholsolsymb(const cs* A, double* b, const css* S, double* x, int* work) {
+  csn* N;
   int n, ok;
   if (!CS_CSC(A) || !b || !S || !x) {
-    cerr << __PRETTY_FUNCTION__ << ": No valid input!" << endl;
+    G2O_DEBUG("No valid input!");
     assert(0);  // get a backtrace in debug mode
     return (0); /* check inputs */
   }
   n = A->n;
   N = cs_chol_workspace(A, S, work, x); /* numeric Cholesky factorization */
   if (!N) {
-    cerr << __PRETTY_FUNCTION__ << ": cholesky failed!" << endl;
-    /*assert(0);*/
+    G2O_DEBUG("cholesky failed!");
   }
   ok = (N != NULL);
   if (ok) {
@@ -65,20 +59,20 @@ int cs_cholsolsymb(const cs *A, number_t *b, const css *S, number_t *x,
  * pointers CSparse: Copyright (c) 2006-2011, Timothy A. Davis.
  */
 /* L = chol (A, [pinv parent cp]), pinv is optional */
-csn *cs_chol_workspace(const cs *A, const css *S, int *cin, number_t *xin) {
-  number_t d, lki, *Lx, *x, *Cx;
-  int top, i, p, k, n, *Li, *Lp, *cp, *pinv, *s, *c, *parent, *Cp, *Ci;
+csn* cs_chol_workspace(const cs* A, const css* S, int* cin, double* xin) {
+  double lki, *Lx, *x, *Cx;
+  int i, p, k, n, *Li, *Lp, *cp, *pinv, *s, *c, *parent, *Cp, *Ci;
   cs *L, *C, *E;
-  csn *N;
+  csn* N;
   if (!CS_CSC(A) || !S || !S->cp || !S->parent) return (NULL);
   n = A->n;
-  N = (csn *)cs_calloc(1, sizeof(csn)); /* allocate result */
-  c = cin;                              /* get int workspace */
-  x = xin;                              /* get number_t workspace */
+  N = static_cast<csn*>(cs_calloc(1, sizeof(csn))); /* allocate result */
+  c = cin;                                          /* get int workspace */
+  x = xin;                                          /* get double workspace */
   cp = S->cp;
   pinv = S->pinv;
   parent = S->parent;
-  C = pinv ? cs_symperm(A, pinv, 1) : ((cs *)A);
+  C = pinv ? cs_symperm(A, pinv, 1) : const_cast<cs*>(A);
   E = pinv ? C : NULL; /* E is alias for A, or a copy E=A(p,p) */
   if (!N || !c || !x || !C) return (cs_ndone(N, E, NULL, NULL, 0));
   s = c + n;
@@ -94,14 +88,14 @@ csn *cs_chol_workspace(const cs *A, const css *S, int *cin, number_t *xin) {
   for (k = 0; k < n; k++) /* compute L(k,:) for L*L' = C */
   {
     /* --- Nonzero pattern of L(k,:) ------------------------------------ */
-    top = cs_ereach(C, k, parent, s, c); /* find pattern of L(k,:) */
-    x[k] = 0;                            /* x (0:k) is now zero */
-    for (p = Cp[k]; p < Cp[k + 1]; p++)  /* x = full(triu(C(:,k))) */
+    int top = cs_ereach(C, k, parent, s, c); /* find pattern of L(k,:) */
+    x[k] = 0;                                /* x (0:k) is now zero */
+    for (p = Cp[k]; p < Cp[k + 1]; p++)      /* x = full(triu(C(:,k))) */
     {
       if (Ci[p] <= k) x[Ci[p]] = Cx[p];
     }
-    d = x[k]; /* d = C(k,k) */
-    x[k] = 0; /* clear x for k+1st iteration */
+    double d = x[k]; /* d = C(k,k) */
+    x[k] = 0;        /* clear x for k+1st iteration */
     /* --- Triangular solve --------------------------------------------- */
     for (; top < n; top++) /* solve L(0:k-1,0:k-1) * x = C(:,k) */
     {
@@ -126,5 +120,4 @@ csn *cs_chol_workspace(const cs *A, const css *S, int *cin, number_t *xin) {
   return (cs_ndone(N, E, NULL, NULL, 1)); /* success: free E,s,x; return N */
 }
 
-}  // namespace csparse_extension
-}  // namespace g2o
+}  // namespace g2o::csparse_extension

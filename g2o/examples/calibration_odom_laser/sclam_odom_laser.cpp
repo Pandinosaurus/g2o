@@ -24,6 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cassert>
 #include <csignal>
 #include <fstream>
 #include <iostream>
@@ -33,10 +34,7 @@
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/stuff/color_macros.h"
 #include "g2o/stuff/command_args.h"
-#include "g2o/stuff/filesys_tools.h"
 #include "g2o/stuff/macros.h"
-#include "g2o/stuff/string_tools.h"
-#include "g2o/stuff/timeutil.h"
 #include "g2o/types/data/data_queue.h"
 #include "g2o/types/data/robot_laser.h"
 #include "g2o/types/sclam2d/odometry_measurement.h"
@@ -144,8 +142,8 @@ int main(int argc, char** argv) {
         OptimizableGraph::Vertex* v =
             static_cast<OptimizableGraph::Vertex*>(it->second);
         if (d.visited().count(v) == 0) {
-          cerr << "\t unvisited vertex " << it->first << " " << (void*)v
-               << endl;
+          cerr << "\t unvisited vertex " << it->first << " "
+               << static_cast<void*>(v) << endl;
           v->setFixed(true);
         }
       }
@@ -202,7 +200,7 @@ int main(int argc, char** argv) {
     cerr << "done." << endl;
   }
 
-  // optional input of a seperate file for applying the odometry calibration
+  // optional input of a separate file for applying the odometry calibration
   if (odomTestFilename.size() > 0) {
     DataQueue testRobotLaserQueue;
     int numTestOdom =
@@ -227,7 +225,7 @@ int main(int argc, char** argv) {
         double dt = cur->timestamp() - prev->timestamp();
         SE2 motion = prev->odomPose().inverse() * cur->odomPose();
 
-        // convert to velocity measurment
+        // convert to velocity Measurement
         MotionMeasurement motionMeasurement(motion.translation().x(),
                                             motion.translation().y(),
                                             motion.rotation().angle(), dt);
@@ -235,13 +233,13 @@ int main(int argc, char** argv) {
             OdomConvert::convertToVelocity(motionMeasurement);
 
         // apply calibration
-        VelocityMeasurement calibratedVelocityMeasurment = velocityMeasurement;
-        calibratedVelocityMeasurment.setVl(odomCalib(0) *
-                                           calibratedVelocityMeasurment.vl());
-        calibratedVelocityMeasurment.setVr(odomCalib(1) *
-                                           calibratedVelocityMeasurment.vr());
+        VelocityMeasurement calibratedVelocityMeasurement = velocityMeasurement;
+        calibratedVelocityMeasurement.setVl(odomCalib(0) *
+                                            calibratedVelocityMeasurement.vl());
+        calibratedVelocityMeasurement.setVr(odomCalib(1) *
+                                            calibratedVelocityMeasurement.vr());
         MotionMeasurement mm = OdomConvert::convertToMotion(
-            calibratedVelocityMeasurment, odomCalib(2));
+            calibratedVelocityMeasurement, odomCalib(2));
 
         // combine calibrated odometry with the previous pose
         SE2 remappedOdom;

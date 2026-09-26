@@ -28,24 +28,33 @@
 
 namespace g2o {
 
-bool EdgeStereoSE3ProjectXYZOnlyPose::read(std::istream &is) {
-  internal::readVector(is, _measurement);
-  return readInformationMatrix(is);
+bool EdgeStereoSE3ProjectXYZOnlyPose::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
+  if (!readInformationMatrix(is)) return false;
+
+  // Optional trailing fields: world-frame landmark Xw and camera
+  // intrinsics (fx, fy, cx, cy, bf). Legacy files that omit these keep
+  // whatever was set on the edge at construction time (typically by
+  // the caller).
+  return internal::readOptional(is, Xw[0], Xw[1], Xw[2], fx, fy, cx, cy, bf);
 }
 
-bool EdgeStereoSE3ProjectXYZOnlyPose::write(std::ostream &os) const {
-  internal::writeVector(os, measurement());
-  return writeInformationMatrix(os);
+bool EdgeStereoSE3ProjectXYZOnlyPose::write(std::ostream& os) const {
+  if (!internal::writeVector(os, measurement())) return false;
+  if (!writeInformationMatrix(os)) return false;
+  os << " " << Xw[0] << " " << Xw[1] << " " << Xw[2] << " " << fx << " " << fy
+     << " " << cx << " " << cy << " " << bf;
+  return !os.fail();
 }
 
 void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
-  VertexSE3Expmap *vi = static_cast<VertexSE3Expmap *>(_vertices[0]);
+  VertexSE3Expmap* vi = static_cast<VertexSE3Expmap*>(_vertices[0]);
   Vector3 xyz_trans = vi->estimate().map(Xw);
 
-  number_t x = xyz_trans[0];
-  number_t y = xyz_trans[1];
-  number_t invz = 1.0 / xyz_trans[2];
-  number_t invz_2 = invz * invz;
+  double x = xyz_trans[0];
+  double y = xyz_trans[1];
+  double invz = 1.0 / xyz_trans[2];
+  double invz_2 = invz * invz;
 
   _jacobianOplusXi(0, 0) = x * y * invz_2 * fx;
   _jacobianOplusXi(0, 1) = -(1 + (x * x * invz_2)) * fx;
@@ -70,20 +79,18 @@ void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
 }
 
 void EdgeStereoSE3ProjectXYZOnlyPose::computeError() {
-  const VertexSE3Expmap *v1 =
-      static_cast<const VertexSE3Expmap *>(_vertices[0]);
+  const VertexSE3Expmap* v1 = static_cast<const VertexSE3Expmap*>(_vertices[0]);
   Vector3 obs(_measurement);
   _error = obs - cam_project(v1->estimate().map(Xw));
 }
 
 bool EdgeStereoSE3ProjectXYZOnlyPose::isDepthPositive() {
-  const VertexSE3Expmap *v1 =
-      static_cast<const VertexSE3Expmap *>(_vertices[0]);
+  const VertexSE3Expmap* v1 = static_cast<const VertexSE3Expmap*>(_vertices[0]);
   return (v1->estimate().map(Xw))(2) > 0;
 }
 
 Vector3 EdgeStereoSE3ProjectXYZOnlyPose::cam_project(
-    const Vector3 &trans_xyz) const {
+    const Vector3& trans_xyz) const {
   const float invz = 1.0f / trans_xyz[2];
   Vector3 res;
   res[0] = trans_xyz[0] * invz * fx + cx;

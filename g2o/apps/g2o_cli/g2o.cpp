@@ -29,7 +29,6 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -50,6 +49,7 @@
 #include "g2o/stuff/color_macros.h"
 #include "g2o/stuff/command_args.h"
 #include "g2o/stuff/filesys_tools.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
 #include "g2o/stuff/string_tools.h"
 #include "g2o/stuff/timeutil.h"
@@ -91,7 +91,7 @@ void sigquit_handler(int sig) {
     hasToStop = 1;
     static int cnt = 0;
     if (cnt++ == 2) {
-      cerr << __PRETTY_FUNCTION__ << " forcing exit" << endl;
+      G2O_WARN("forcing exit");
       exit(1);
     }
   }
@@ -132,10 +132,9 @@ int main(int argc, char** argv) {
   CommandArgs arg;
   arg.param("i", maxIterations, 5,
             "perform n iterations, if negative consider the gain");
-  arg.param("gain", gain, 1e-6,
-            "the gain used to stop optimization (default = 1e-6)");
+  arg.param("gain", gain, 1e-6, "the gain used to stop optimization");
   arg.param("ig", maxIterationsWithGain, std::numeric_limits<int>::max(),
-            "Maximum number of iterations with gain enabled (default: inf)");
+            "Maximum number of iterations with gain enabled");
   arg.param("v", verbose, false, "verbose output of the optimization process");
   arg.param("guess", initialGuess, false,
             "initial guess based on spanning tree");
@@ -511,7 +510,7 @@ int main(int argc, char** argv) {
                 //<< from->id() << "(" << from->dimension() << ") " << endl;
                 e->initialEstimate(toSet, from);
               } else {
-                assert(0 && "Added unitialized variable to the graph");
+                assert(0 && "Added uninitialized variable to the graph");
               }
               break;
             }
@@ -524,7 +523,7 @@ int main(int argc, char** argv) {
                 //<< to->id() << "(" << to->dimension() << ") " << endl;
                 e->initialEstimate(fromSet, to);
               } else {
-                assert(0 && "Added unitialized variable to the graph");
+                assert(0 && "Added uninitialized variable to the graph");
               }
               break;
             }

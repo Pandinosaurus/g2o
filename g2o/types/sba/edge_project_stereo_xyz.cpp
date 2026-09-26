@@ -31,9 +31,9 @@ namespace g2o {
 EdgeStereoSE3ProjectXYZ::EdgeStereoSE3ProjectXYZ()
     : BaseBinaryEdge<3, Vector3, VertexPointXYZ, VertexSE3Expmap>() {}
 
-Vector3 EdgeStereoSE3ProjectXYZ::cam_project(const Vector3 &trans_xyz,
-                                             const float &bf) const {
-  const number_t invz = 1.0f / trans_xyz[2];
+Vector3 EdgeStereoSE3ProjectXYZ::cam_project(const Vector3& trans_xyz,
+                                             const float& bf) const {
+  const double invz = 1.0f / trans_xyz[2];
   Vector3 res;
   res[0] = trans_xyz[0] * invz * fx + cx;
   res[1] = trans_xyz[1] * invz * fy + cy;
@@ -41,29 +41,36 @@ Vector3 EdgeStereoSE3ProjectXYZ::cam_project(const Vector3 &trans_xyz,
   return res;
 }
 
-bool EdgeStereoSE3ProjectXYZ::read(std::istream &is) {
-  internal::readVector(is, _measurement);
-  return readInformationMatrix(is);
+bool EdgeStereoSE3ProjectXYZ::read(std::istream& is) {
+  if (!internal::readVector(is, _measurement)) return false;
+  if (!readInformationMatrix(is)) return false;
+
+  // Optional trailing camera intrinsics (fx, fy, cx, cy, bf). Legacy
+  // files that omit these keep the default values set at construction
+  // time.
+  return internal::readOptional(is, fx, fy, cx, cy, bf);
 }
 
-bool EdgeStereoSE3ProjectXYZ::write(std::ostream &os) const {
-  internal::writeVector(os, measurement());
-  return writeInformationMatrix(os);
+bool EdgeStereoSE3ProjectXYZ::write(std::ostream& os) const {
+  if (!internal::writeVector(os, measurement())) return false;
+  if (!writeInformationMatrix(os)) return false;
+  os << " " << fx << " " << fy << " " << cx << " " << cy << " " << bf;
+  return !os.fail();
 }
 
 void EdgeStereoSE3ProjectXYZ::linearizeOplus() {
-  VertexSE3Expmap *vj = static_cast<VertexSE3Expmap *>(_vertices[1]);
+  VertexSE3Expmap* vj = static_cast<VertexSE3Expmap*>(_vertices[1]);
   SE3Quat T(vj->estimate());
-  VertexPointXYZ *vi = static_cast<VertexPointXYZ *>(_vertices[0]);
+  VertexPointXYZ* vi = static_cast<VertexPointXYZ*>(_vertices[0]);
   Vector3 xyz = vi->estimate();
   Vector3 xyz_trans = T.map(xyz);
 
   const Matrix3 R = T.rotation().toRotationMatrix();
 
-  number_t x = xyz_trans[0];
-  number_t y = xyz_trans[1];
-  number_t z = xyz_trans[2];
-  number_t z_2 = z * z;
+  double x = xyz_trans[0];
+  double y = xyz_trans[1];
+  double z = xyz_trans[2];
+  double z_2 = z * z;
 
   _jacobianOplusXi(0, 0) = -fx * R(0, 0) / z + fx * x * R(2, 0) / z_2;
   _jacobianOplusXi(0, 1) = -fx * R(0, 1) / z + fx * x * R(2, 1) / z_2;

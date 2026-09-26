@@ -26,8 +26,7 @@
 
 #include "edge_se3_pointxyz_disparity.h"
 
-#include <iomanip>
-#include <iostream>
+#include <cassert>
 
 #ifdef G2O_HAVE_OPENGL
 #include "g2o/stuff/opengl_primitives.h"
@@ -59,14 +58,14 @@ bool EdgeSE3PointXYZDisparity::resolveCaches() {
 }
 
 bool EdgeSE3PointXYZDisparity::read(std::istream& is) {
-  readParamIds(is);
-  internal::readVector(is, _measurement);
+  if (!readParamIds(is)) return false;
+  if (!internal::readVector(is, _measurement)) return false;
   return readInformationMatrix(is);
 }
 
 bool EdgeSE3PointXYZDisparity::write(std::ostream& os) const {
-  writeParamIds(os);
-  internal::writeVector(os, measurement());
+  if (!writeParamIds(os)) return false;
+  if (!internal::writeVector(os, measurement())) return false;
   return writeInformationMatrix(os);
 }
 
@@ -110,11 +109,11 @@ void EdgeSE3PointXYZDisparity::linearizeOplus() {
 
   J.block<3, 3>(0, 6) = cache->w2l().rotation();
 
-  // Eigen::Matrix<number_t,3,9,Eigen::ColMajor> Jprime =
+  // Eigen::Matrix<double,3,9,Eigen::ColMajor> Jprime =
   // vcache->params->Kcam_inverseOffsetR  * J;
-  Eigen::Matrix<number_t, 3, 9, Eigen::ColMajor> Jprime =
+  Eigen::Matrix<double, 3, 9, Eigen::ColMajor> Jprime =
       params->Kcam_inverseOffsetR() * J;
-  Eigen::Matrix<number_t, 3, 9, Eigen::ColMajor> Jhom;
+  Eigen::Matrix<double, 3, 9, Eigen::ColMajor> Jhom;
   Vector3 Zprime = cache->w2i() * pt;
 
   Jhom.block<2, 9>(0, 0) = 1 / (Zprime(2) * Zprime(2)) *
@@ -133,11 +132,6 @@ bool EdgeSE3PointXYZDisparity::setMeasurementFromState() {
   // VertexSE3 *cam = static_cast< VertexSE3*>(_vertices[0]);
   VertexPointXYZ* point = static_cast<VertexPointXYZ*>(_vertices[1]);
   const Vector3& pt = point->estimate();
-
-  // VertexCameraCache* vcache = (VertexCameraCache*)
-  // cam->getCache(_cacheIds[0]); if (! vcache){
-  //   cerr << "fatal error in retrieving cache" << endl;
-  // }
 
   Vector3 p = cache->w2i() * pt;
 
@@ -159,15 +153,10 @@ void EdgeSE3PointXYZDisparity::initialEstimate(
   VertexSE3* cam = dynamic_cast<VertexSE3*>(_vertices[0]);
   VertexPointXYZ* point = dynamic_cast<VertexPointXYZ*>(_vertices[1]);
 
-  // VertexCameraCache* vcache = (VertexCameraCache* )
-  // cam->getCache(_cacheIds[0]); if (! vcache){
-  //   cerr << "fatal error in retrieving cache" << endl;
-  // }
-  // ParameterCamera* params=vcache->params;
-  const Eigen::Matrix<number_t, 3, 3, Eigen::ColMajor>& invKcam =
+  const Eigen::Matrix<double, 3, 3, Eigen::ColMajor>& invKcam =
       params->invKcam();
   Vector3 p;
-  number_t w = 1. / _measurement(2);
+  double w = 1. / _measurement(2);
   p.head<2>() = _measurement.head<2>() * w;
   p(2) = w;
   p = invKcam * p;

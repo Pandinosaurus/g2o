@@ -37,31 +37,24 @@
 namespace g2o {
 
 class EdgeLine2DPointXY
-    : public BaseBinaryEdge<1, number_t, VertexLine2D,
-                            VertexPointXY>  // Avoid redefinition of BaseEdge in
-                                            // MSVC
-{
+    : public BaseBinaryEdge<1, double, VertexLine2D, VertexPointXY> {
  public:
-  G2O_TYPES_SLAM2D_ADDONS_API EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-      G2O_TYPES_SLAM2D_ADDONS_API
-      EdgeLine2DPointXY();
+  G2O_TYPES_SLAM2D_ADDONS_API EdgeLine2DPointXY();
 
   G2O_TYPES_SLAM2D_ADDONS_API void computeError() {
     const VertexLine2D* l = static_cast<const VertexLine2D*>(_vertices[0]);
     const VertexPointXY* p = static_cast<const VertexPointXY*>(_vertices[1]);
     Vector2 n(std::cos(l->theta()), std::sin(l->theta()));
-    number_t prediction = n.dot(p->estimate()) - l->rho();
+    double prediction = n.dot(p->estimate()) - l->rho();
     _error[0] = prediction - _measurement;
   }
 
-  G2O_TYPES_SLAM2D_ADDONS_API virtual bool setMeasurementData(
-      const number_t* d) {
+  G2O_TYPES_SLAM2D_ADDONS_API virtual bool setMeasurementData(const double* d) {
     _measurement = *d;
     return true;
   }
 
-  G2O_TYPES_SLAM2D_ADDONS_API virtual bool getMeasurementData(
-      number_t* d) const {
+  G2O_TYPES_SLAM2D_ADDONS_API virtual bool getMeasurementData(double* d) const {
     *d = _measurement;
     return true;
   }
@@ -74,43 +67,14 @@ class EdgeLine2DPointXY
     const VertexLine2D* l = static_cast<const VertexLine2D*>(_vertices[0]);
     const VertexPointXY* p = static_cast<const VertexPointXY*>(_vertices[1]);
     Vector2 n(std::cos(l->theta()), std::sin(l->theta()));
-    number_t prediction = n.dot(p->estimate()) - l->rho();
+    double prediction = n.dot(p->estimate()) - l->rho();
     _measurement = prediction;
     return true;
   }
 
   G2O_TYPES_SLAM2D_ADDONS_API virtual bool read(std::istream& is);
   G2O_TYPES_SLAM2D_ADDONS_API virtual bool write(std::ostream& os) const;
-
-  /* virtual void initialEstimate(const OptimizableGraph::VertexSet& from,
-   * OptimizableGraph::Vertex* to); */
-  /* virtual number_t initialEstimatePossible(const OptimizableGraph::VertexSet&
-   * from, OptimizableGraph::Vertex* to) { (void) to; return
-   * (from.count(_vertices[0]) == 1 ? 1.0 : -1.0);} */
-  /* #ifndef NUMERIC_JACOBIAN_TWO_D_TYPES */
-  /*       virtual void linearizeOplus(); */
-  /* #endif */
 };
-
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeLine2DPointXYWriteGnuplotAction:
- * public WriteGnuplotAction { */
-/*   public: */
-/*     EdgeLine2DPointXYWriteGnuplotAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-
-/* #ifdef G2O_HAVE_OPENGL */
-/*   class G2O_TYPES_SLAM2D_ADDONS_API EdgeLine2DPointXYDrawAction: public
- * DrawAction{ */
-/*   public: */
-/*     EdgeLine2DPointXYDrawAction(); */
-/*     virtual HyperGraphElementAction*
- * operator()(HyperGraph::HyperGraphElement* element,  */
-/*             HyperGraphElementAction::Parameters* params_); */
-/*   }; */
-/* #endif */
 
 }  // namespace g2o
 

@@ -31,6 +31,7 @@
 #include "g2o/core/optimization_algorithm_levenberg.h"
 #include "g2o/core/solver.h"
 #include "g2o/core/sparse_optimizer.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/macros.h"
 #include "linear_solver_eigen.h"
 
@@ -41,12 +42,13 @@ namespace g2o {
 namespace {
 template <int p, int l, bool blockorder>
 std::unique_ptr<BlockSolverBase> AllocateSolver() {
-  std::cerr << "# Using EigenSparseCholesky poseDim " << p << " landMarkDim "
-            << l << " blockordering " << blockorder << std::endl;
-  auto linearSolver = g2o::make_unique<
+  G2O_DEBUG(
+      "Using EigenSparseCholesky poseDim {} landMarkDim {} blockordering {}", p,
+      l, blockorder);
+  auto linearSolver = std::make_unique<
       LinearSolverEigen<typename BlockSolverPL<p, l>::PoseMatrixType>>();
   linearSolver->setBlockOrdering(blockorder);
-  return g2o::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
+  return std::make_unique<BlockSolverPL<p, l>>(std::move(linearSolver));
 }
 }  // namespace
 
@@ -64,7 +66,7 @@ static OptimizationAlgorithm* createSolver(const std::string& fullSolverName) {
           {"fix3_2_scalar", &AllocateSolver<3, 2, false>},
           {"fix6_3_scalar", &AllocateSolver<6, 3, false>},
           {"fix7_3_scalar", &AllocateSolver<7, 3, false>},
-      };
+  };
 
   string solverName = fullSolverName.substr(3);
   auto solverf = solver_factories.find(solverName);

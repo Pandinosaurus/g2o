@@ -29,12 +29,14 @@
 
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
+#include <cassert>
 #include <iostream>
 #include <vector>
 
 #include "g2o/core/batch_stats.h"
 #include "g2o/core/linear_solver.h"
 #include "g2o/core/marginal_covariance_cholesky.h"
+#include "g2o/stuff/logger.h"
 #include "g2o/stuff/timeutil.h"
 
 namespace g2o {
@@ -48,8 +50,8 @@ namespace g2o {
 template <typename MatrixType>
 class LinearSolverEigen : public LinearSolverCCS<MatrixType> {
  public:
-  typedef Eigen::SparseMatrix<number_t, Eigen::ColMajor> SparseMatrix;
-  typedef Eigen::Triplet<number_t> Triplet;
+  typedef Eigen::SparseMatrix<double, Eigen::ColMajor> SparseMatrix;
+  typedef Eigen::Triplet<double> Triplet;
   typedef Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic>
       PermutationMatrix;
 
@@ -89,7 +91,7 @@ class LinearSolverEigen : public LinearSolverCCS<MatrixType> {
     return true;
   }
 
-  bool solve(const SparseBlockMatrix<MatrixType>& A, number_t* x, number_t* b) {
+  bool solve(const SparseBlockMatrix<MatrixType>& A, double* x, double* b) {
     double t;
     bool cholState = computeCholesky(A, t);
     if (!cholState) return false;
@@ -125,10 +127,11 @@ class LinearSolverEigen : public LinearSolverCCS<MatrixType> {
     if (_cholesky.info() !=
         Eigen::Success) {  // the matrix is not positive definite
       if (this->writeDebug()) {
-        std::cerr << "Cholesky failure, writing debug.txt (Hessian loadable by "
-                     "Octave)"
-                  << std::endl;
+        G2O_ERROR(
+            "Cholesky failure, writing debug.txt (Hessian loadable by Octave)");
         A.writeOctave("debug.txt");
+      } else {
+        G2O_DEBUG("Cholesky failure");
       }
       return false;
     }
@@ -136,13 +139,13 @@ class LinearSolverEigen : public LinearSolverCCS<MatrixType> {
   }
 
   /**
-   * compute the symbolic decompostion of the matrix only once.
+   * compute the symbolic decomposition of the matrix only once.
    * Since A has the same pattern in all the iterations, we only
    * compute the fill-in reducing ordering once and re-use for all
    * the following iterations.
    */
   void computeSymbolicDecomposition(const SparseBlockMatrix<MatrixType>& A) {
-    number_t t = get_monotonic_time();
+    double t = get_monotonic_time();
     if (!this->blockOrdering()) {
       _cholesky.analyzePattern(_sparseMatrix);
     } else {
@@ -207,8 +210,7 @@ class LinearSolverEigen : public LinearSolverCCS<MatrixType> {
             _cholesky.matrixL().nestedExpression().outerIndexPtr()),
         const_cast<int*>(
             _cholesky.matrixL().nestedExpression().innerIndexPtr()),
-        const_cast<number_t*>(
-            _cholesky.matrixL().nestedExpression().valuePtr()),
+        const_cast<double*>(_cholesky.matrixL().nestedExpression().valuePtr()),
         const_cast<int*>(_cholesky.permutationP().indices().data()));
     compute(mcc);  // call the desired computation on the mcc object
     // book keeping statistics

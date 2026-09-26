@@ -26,9 +26,8 @@
 
 #include "cache.h"
 
-#include <iostream>
-
 #include "factory.h"
+#include "g2o/stuff/logger.h"
 #include "optimizable_graph.h"
 
 namespace g2o {
@@ -101,7 +100,7 @@ Cache* Cache::installDependency(const std::string& type_,
   return c;
 }
 
-bool Cache::resolveDependancies() { return true; }
+bool Cache::resolveDependencies() { return true; }
 
 CacheContainer::CacheContainer(OptimizableGraph::Vertex* vertex_)
     : _updateNeeded(true) {
@@ -118,19 +117,18 @@ Cache* CacheContainer::createCache(const Cache::CacheKey& key) {
   Factory* f = Factory::instance();
   HyperGraph::HyperGraphElement* e = f->construct(key.type());
   if (!e) {
-    cerr << __PRETTY_FUNCTION__ << endl;
-    cerr << "fatal error in creating cache of type " << key.type() << endl;
+    G2O_ERROR("fatal error in creating cache of type {}", key.type());
     return nullptr;
   }
   Cache* c = dynamic_cast<Cache*>(e);
   if (!c) {
-    cerr << __PRETTY_FUNCTION__ << endl;
-    cerr << "fatal error in creating cache of type " << key.type() << endl;
+    G2O_ERROR("fatal error in creating cache of type {}, wrong type",
+              key.type());
     return nullptr;
   }
   c->_container = this;
   c->_parameters = key._parameters;
-  if (c->resolveDependancies()) {
+  if (c->resolveDependencies()) {
     insert(make_pair(key, c));
     c->update();
     return c;
